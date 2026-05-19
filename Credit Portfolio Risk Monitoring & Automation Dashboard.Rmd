@@ -1,0 +1,3325 @@
+---
+title: "Credit Portfolio Risk Monitoring & Automation Dashboard"
+author: "Zahra Nur Anisah"
+date: "`r format(Sys.Date(), '%B %e, %Y')`"
+output:
+  html_document:
+    theme: cosmo
+    highlight: breezedark
+    toc: true
+    toc_float:
+      collapsed: false
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+# clear-up the environment
+rm(list = ls())
+
+# chunk options
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  comment = "#>"
+)
+
+options(scipen = 100)
+```
+
+
+# Project Description
+This project focuses on developing an **interactive Credit Portfolio Risk Monitoring and Automation Dashboard** using **R Shiny**, designed to help financial institutions monitor loan performance and detect early signs of credit risk.
+
+The dashboard delivers comprehensive automation and analytics capabilities, such as:
+- Integrated **Gross**, **Net**, and **External** portfolios across **7 islands** and **37 regions** throughout **Indonesia**.  
+- Automated the tracking of key **credit risk indicators**, including:  
+  - **Days Past Due (DPD) buckets**  
+  - **Non-Performing Loan (NPL) ratios**  
+  - **Flow rate movements**  
+- Reduced **manual reporting efforts** by **up to 95%** through automation and **real-time portfolio monitoring**.  
+
+  
+# Introduction
+The first step involves importing all necessary libraries that support data manipulation, visualization, and the creation of an interactive dashboard.
+
+```{r, warning=FALSE}
+# Load required libraries
+library(dplyr)   # Data manipulation
+library(ggplot2) # Data visualization
+library(ggpubr)    
+library(scales)  # For number formatting (commas, percentages)
+library(tidyverse)  # For data cleaning and manipulation 
+library(glue) 
+library(plotly)  # For interactive visualizations
+library(lubridate)   # For working with date and time
+options(scipen = 100) # Prevent scientific notation in numeric outputs
+library(readxl)      
+library(purrr) # Mapping function over lists
+```
+
+
+# Load Data
+Before reading the three datasets **(Gross, Net, and External)**, we first need to create a dedicated folder for each dataset on our local computer, ideally within the same directory as the project file. Each folder will serve as a dedicated storage location for the files containing the respective data.
+
+This setup makes it easy to keep the datasets up to date, you can simply add new files to the corresponding folder, and the code will automatically detect, compile, and merge all files within that folder into a single, unified dataset.
+
+After completing the folder setup, we can proceed to load and read the three datasets (Gross, Net, and External), from their respective directories:
+
+1. *Gross*
+```{r}
+# Read Data: Gross
+# Define the folder path for the "Gross" dataset
+folder_path_gross <- "dataset/DPD NPL Gross Net Extrenal/Gross/"
+
+# List all .xlsx files in the "Gross" folder
+file_list_gross <- list.files(path = folder_path_gross,
+                              pattern = "\\.xlsx$",
+                              full.name = TRUE)
+
+# Combine all Excel files into one dataframe
+sqllab_gross <- file_list_gross %>% 
+  map_df(read_excel)
+
+# Read all "Gross" dataset files (including possible duplicates and NA values)
+sqllab_gross
+
+# Read top 10 "Gross" dataset 
+head(sqllab_gross,10)
+```
+
+2. *Net*
+```{r}
+# Read Data: Net
+# Define the folder path for the "Net" dataset
+folder_path_net <- "dataset/DPD NPL Gross Net Extrenal/Net/"
+
+# List all .xlsx files in the "Net" folder
+file_list_net <- list.files(path = folder_path_net,
+                              pattern = "\\.xlsx$",
+                              full.name = TRUE)
+
+# Combine all Excel files into one dataframe
+sqllab_net <- file_list_net %>% 
+  map_df(read_excel)
+
+# Read all "Net" dataset files (including possible duplicates and NA values)
+sqllab_net
+
+# Read top 10 "Net" dataset
+head(sqllab_net,10)
+```
+
+3. *External*
+```{r}
+# Read Data: External
+# Define the folder path for the "External" dataset
+folder_path_external <- "dataset/DPD NPL Gross Net Extrenal/External/"
+
+# List all .xlsx files in the "External" folder
+file_list_external <- list.files(path = folder_path_external,
+                              pattern = "\\.xlsx$",
+                              full.name = TRUE)
+
+# Combine all Excel files into one dataframe
+sqllab_external <- file_list_external %>% 
+  map_df(read_excel)
+
+# Read all "External" dataset files (including possible duplicates and NA values)
+sqllab_external
+
+# Read top 10 "External" dataset
+head(sqllab_external,10)
+```
+
+Here are the descriptions of each column in all three datasets.
+
+- `cut_off_date`: the date when the data was extracted or recorded (in YYYY-MM-DD format).
+- `island`: the main island or geographical region where the accounts is located.
+- `region`: the operational region under an island used for grouping working areas.
+- `area`: the operational coverage area that supervises several branches within a region.
+- `branch`: the branch or operational unit where the accounts is managed.
+- `bucket`: the category group representing loan delinquency or credit quality, usually based on Days Past Due (DPD) ranges.
+- `noa`: the number of accounts (Number of accounts) in the loan portfolio.
+- `outstanding_amount`: the total outstanding balance or remaining unpaid loan amount.
+
+Now that we’ve read all the datasets and stored them in their respective variables, it’s time to move on to **Data Cleaning & Preprocessing** to ensure the data is accurate, consistent, and ready for further analysis.
+
+
+# Data Cleaning & Prepocessing
+Here are the following steps required to clean and preprocess your dataset so that it’s ready for data analysis:
+
+- **1️⃣ Data Cleansing**, which includes:  
+  - Deleting unnecessary columns or rows  
+  - Renaming columns for consistency  
+  - Changing data types  
+  - Adding new columns  
+  - Sorting data (if needed)  
+
+- **2️⃣ Remove Missing Data (NA values)**  
+
+- **3️⃣ Remove Duplicate Data**  
+
+
+## Gross Dataset
+```{r}
+# Checking the "Gross" dataset's dimension
+dim(sqllab_gross)
+```
+
+```{r}
+# Checking data types for each column
+summary(sqllab_gross)
+```
+
+```{r}
+# Gross Dataset
+sqllab_gross
+```
+
+```{r}
+# Data Cleansing & Preprocessing: Gross
+# 1. Cleansing Data
+sqllab_gross_clean <- sqllab_gross %>% 
+
+  mutate(
+    # Changing data types
+    cut_off_date= ymd(cut_off_date),
+    island = as.factor(island), 
+    region = as.factor(region),
+    area = as.factor(area), 
+    branch = as.factor(branch), 
+    bucket = as.factor(bucket),
+    noa = as.integer(noa),
+    outstanding_amount = as.numeric(outstanding_amount),
+    
+    # adding new column
+    date = day(cut_off_date),
+    month = month(cut_off_date),
+    year = year(cut_off_date)
+  ) %>% 
+  
+  arrange(desc(cut_off_date))
+
+sqllab_gross_clean
+```
+
+```{r}
+# 2. Delete NA/ Missing Data
+# Checking if there are any missing data
+sqllab_gross_clean %>% is.na() %>% colSums()
+```
+
+```{r}
+# If we want to see the missing data
+sqllab_gross_clean %>% 
+  filter(if_any(everything(),is.na))
+```
+
+```{r}
+# If there are any NA values, remove the rows containing NA
+sqllab_gross_clean <- sqllab_gross_clean %>% 
+  drop_na()
+
+# Check the dimensions of the Gross dataset after removing NA values
+dim(sqllab_gross_clean)
+```
+There are *no NA/ missing data* in the Gross dataset
+
+```{r}
+# 3. Delete Duplicate Data
+# Checking if there are any duplicate data
+sqllab_gross_clean %>% duplicated() %>% sum()
+```
+
+```{r}
+# If there are any duplicates, keep only the unique rows OR remove any duplicates
+sqllab_gross_clean <- sqllab_gross_clean %>% 
+  distinct(.keep_all = TRUE)
+
+# Check the dimensions of the Gross dataset after removing duplicates
+dim(sqllab_gross_clean)
+```
+There are *no duplicate data* in the Gross dataset
+
+```{r}
+# Final "Gross" dataset form
+sqllab_gross_clean
+```
+
+
+## Net Dataset
+```{r}
+# Checking the "Net" dataset's dimension
+dim(sqllab_net)
+```
+
+```{r}
+# Checking data types for each column
+summary(sqllab_net)
+```
+
+```{r}
+# Net Dataset
+sqllab_net
+```
+
+```{r}
+# Data Cleansing & Preprocessing: Net
+# 1. Cleansing Data
+sqllab_net_clean <- sqllab_net %>% 
+  
+  mutate(
+    # Changing data types
+    cut_off_date= ymd(cut_off_date),
+    island = as.factor(island), 
+    region = as.factor(region),
+    area = as.factor(area), 
+    branch = as.factor(branch), 
+    bucket = as.factor(bucket),
+    noa = as.integer(noa),
+    outstanding_amount = as.numeric(outstanding_amount),
+    
+    # adding new column
+    date = day(cut_off_date),
+    month = month(cut_off_date),
+    year = year(cut_off_date)
+  ) %>% 
+  
+  arrange(desc(cut_off_date))
+
+sqllab_net_clean
+```
+
+```{r}
+# 2. Delete NA/ Missing Data
+# Checking if there are any missing data
+sqllab_net_clean %>% is.na() %>% colSums()
+```
+
+```{r}
+# If we want to see the missing data
+sqllab_net_clean %>% 
+  filter(if_any(everything(),is.na))
+```
+
+```{r}
+# If there are any NA values, remove the rows containing NA
+sqllab_net_clean <- sqllab_net_clean %>% 
+  drop_na()
+
+# Check the dimensions of the Net dataset after removing NA values
+dim(sqllab_net_clean)
+```
+There are *no NA/ missing data* in the Net dataset
+
+```{r}
+# 3. Delete Duplicate Data
+# Checking if there are any duplicate data
+sqllab_net_clean %>% duplicated() %>% sum()
+```
+
+```{r}
+# If there are any duplicates, keep only the unique rows OR remove any duplicates
+sqllab_net_clean <- sqllab_net_clean %>% 
+  distinct(.keep_all = TRUE)
+
+# Check the dimensions of the Net dataset after removing duplicates
+dim(sqllab_net_clean)
+```
+There are *no duplicate data* in the Net dataset
+
+```{r}
+# Final "Net" dataset form
+sqllab_net_clean
+```
+
+
+## External Dataset
+```{r}
+# Checking the "External" dataset's dimension
+dim(sqllab_external)
+```
+
+```{r}
+# Checking data types for each column
+summary(sqllab_external)
+```
+
+```{r}
+# External Dataset
+sqllab_external
+```
+
+```{r}
+# Data Cleansing & Preprocessing: External
+# 1. Cleansing Data
+sqllab_external_clean <- sqllab_external %>% 
+  
+  mutate(
+    # Changing data types
+    cut_off_date= ymd(cut_off_date),
+    island = as.factor(island), 
+    region = as.factor(region),
+    area = as.factor(area), 
+    branch = as.factor(branch), 
+    bucket = as.factor(bucket),
+    noa = as.integer(noa),
+    outstanding_amount = as.numeric(outstanding_amount),
+    
+    # adding new column
+    date = day(cut_off_date),
+    month = month(cut_off_date),
+    year = year(cut_off_date)
+  ) %>% 
+  
+  arrange(desc(cut_off_date))
+
+sqllab_external_clean
+```
+
+```{r}
+# 2. Delete NA/ Missing Data
+# Checking if there are any missing data
+sqllab_external_clean %>% is.na() %>% colSums()
+```
+
+```{r}
+# If we want to see the missing data
+sqllab_external_clean %>% 
+  filter(if_any(everything(),is.na))
+```
+
+```{r}
+# If there are any NA values, remove the rows containing NA
+sqllab_external_clean <- sqllab_external_clean %>% 
+  drop_na()
+
+# Check the dimensions of the External dataset after removing NA values
+dim(sqllab_external_clean)
+```
+There are *no NA/ missing data* in the External dataset
+
+```{r}
+# 3. Delete Duplicate Data
+# Checking if there are any duplicate data
+sqllab_external_clean %>% duplicated() %>% sum()
+```
+
+```{r}
+# If there are any duplicates, keep only the unique rows OR remove any duplicates
+sqllab_external_clean <- sqllab_external_clean %>% 
+  distinct(.keep_all = TRUE)
+
+# Check the dimensions of the External dataset after removing duplicates
+dim(sqllab_external_clean)
+```
+There are *no duplicate data* in the External dataset
+
+```{r}
+# Final "External" dataset form
+sqllab_external_clean
+```
+
+
+# TAB 1 (NPL OVERVIEW)
+
+In this **NPL Overview**, the analysis focuses on identifying the **total outstanding amount** for each island by aggregating the outstanding amounts across all buckets for every island and each specific reporting date.
+
+The dashboard also compares **weekly NPL performance** across islands using three different **NPL coverage levels**: `External`, `Net`, and `Gross`.
+
+- `NPL External`: includes only the external portion of non-performing loans.  
+- `NPL Net`: includes the external portion along with eligible claim insurance coverage.  
+- `NPL Gross`: provides the broadest coverage by including NPL Net and additional non-performing loan exposure, including write-offs (+WO).
+
+## Line 1 (Overview Gross)
+### PLOT 1.1.a: (bar plot)
+"Gross: Weekly Total Outstanding ~ Island vs Total Outstanding Amount"
+```{r}
+# Dataset: Gross
+sqllab_gross_clean
+```
+
+```{r}
+# category in island
+unique(sqllab_gross_clean$island)
+```
+There are 7 islands in the "Gross" dataset.
+
+```{r}
+# category in region
+unique(sqllab_gross_clean$region)
+```
+There are 37 regions in the "Gross" dataset.
+
+Now, I’m going to wrangle the data to capture only the total outstanding amount for each island, comparing the values between last week and this week.
+
+```{r}
+# Data Wrangling
+gross_total_outstanding <- sqllab_gross_clean %>%
+  filter(cut_off_date <= "2025-11-01") %>% 
+  group_by(cut_off_date, island) %>% 
+  summarise(total_outstanding_amount= sum(outstanding_amount)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date)) %>% 
+  mutate(
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>% 
+  head(14) # this and last week
+
+gross_total_outstanding
+```
+
+```{r}
+# tooltip
+gross_total_outstanding <- gross_total_outstanding %>% 
+  mutate(
+    label = glue(
+      "Total Oustanding:IDR {number(total_outstanding_amount, big.mark = '.', decimal.mark = ',', accuracy = 1)}
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+gross_total_outstanding
+```
+
+```{r}
+# PLOT 1.1 a: Weekly Gross Total Outstanding (Current Cut-Off)
+plot1.1.a <- ggplot(gross_total_outstanding, aes(x = island, 
+                    y = total_outstanding_amount,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Date)) +
+  scale_y_continuous(labels = label_number(scale = 1e-9, 
+                                           suffix = "B",
+                                           accuracy = 1)) +
+  geom_text(aes(y = total_outstanding_amount + 1.5e10,
+                label = format(floor(total_outstanding_amount/1e8)/10,
+                                     big.mark = ".",
+                                     decimal.mark = ","),
+                group = Date),
+            position = position_dodge(width = 1),
+            size = 2.8) +
+  scale_fill_manual(values= c("lavender","purple")) +
+  labs(title = "Weekly Gross Total Outstanding",
+       subtitle = "in billion Rupiah", 
+       x = "Island",
+       y = "Total Outstanding",
+       fill = "Date") +
+  theme_minimal() +
+  theme(legend.position = "bottom") 
+
+ggplotly(plot1.1.a, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "Weekly Gross Total Outstanding",
+      "<br><sup>in billion Rupiah</sup>")),
+      legend = list(orientation = "h",  
+                    y = -0.3)
+    )
+```
+This bar chart compares the total outstanding amounts across Indonesia's islands for the last two weeks (**25 October 2025** and **01 November 2025**). The visualization highlights weekly financial performance trends regionally.
+
+- **Sumatera** consistently leads with the highest total outstanding, maintaining above **480 million Rupiah** over the last two weeks.  
+- **Jawa** follows as the second-highest, showing a slight increase from **294.6M** to **305.0M**.
+- **Bali & Nusa Tenggara** and **Maluku** record the lowest figures, with minor week-over-week decreases.
+
+
+### PLOT 1.1.b: (bar plot)
+"Gross: Weekly NPL Comparison by Island ~ Island vs NPL"
+```{r}
+# Dataset: Gross
+sqllab_gross_clean
+```
+
+```{r}
+# category in bucket
+unique(sqllab_gross_clean$bucket)
+```
+There are 5 bucket category in the "Gross" dataset.
+
+
+In order to obtain the **NPL value**, we first need to calculate the ratio between the **total outstanding amount in the “DPD 90+” bucket** and the **overall total outstanding amount** for each cut-off date and island.
+
+The **Non-Performing Loan (NPL)** ratio can be calculated as:  
+$$
+\text{NPL} = \frac{\text{Total Outstanding Amount (DPD 90+)}}{\text{Total Outstanding Amount (All Buckets)}}
+$$
+
+To begin, we’ll calculate the total outstanding amount for loans in the **05. 90+ DPD** bucket, summarized by **cut-off date** and **island**.
+```{r}
+# Data Wrangling
+# Total amount DPD 90+
+gross_DPD_90 <- sqllab_gross_clean %>%
+  filter(bucket == "05. 90+ DPD") %>% 
+  group_by(cut_off_date, island) %>% 
+  summarise(DPD_90 = sum(outstanding_amount)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date)) %>% 
+  mutate(
+    date = day(cut_off_date)
+  )
+
+gross_DPD_90
+```
+
+Next, we’ll calculate the total outstanding amount for each **cut-off date** and **island** across **all DPD buckets**.
+```{r}
+# Data Wrangling 2
+# Total Outstanding 2
+gross_total_outstanding2 <- sqllab_gross_clean %>%
+  group_by(cut_off_date, island) %>% 
+  summarise(total_outstanding_amount= sum(outstanding_amount)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date)) %>% 
+  mutate(
+    date = day(cut_off_date)
+  )
+
+gross_total_outstanding2
+```
+
+Next, we’ll merge the datasets containing the **DPD 90+ outstanding amount** and the **total outstanding amount** into a single dataframe, allowing us to **calculate the NPL** ratio for each cut-off date and island.
+```{r}
+# Merge DPD 90+ outstanding amount with total outstanding amount to calculate current NPL
+gross_NPL_Current <- gross_DPD_90 %>% 
+  inner_join(gross_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    NPL = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01") %>% 
+  head(14) # this and last week
+
+gross_NPL_Current
+```
+
+```{r}
+# tooltip
+gross_NPL_Current <- gross_NPL_Current %>% 
+  mutate(
+    label = glue(
+      "NPL: {number(NPL,  big.mark = '.', decimal.mark = ',', accuracy = 0.01)}%
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+gross_NPL_Current
+```
+
+```{r}
+# PLOT 1.1.b: NPL Comparison by Island
+plot1.1.b <- ggplot(gross_NPL_Current, aes(x = island, 
+                    y = NPL,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Date)) +
+  geom_text(aes(y = NPL + 0.8,
+                label = label_number(big.mark = ".",
+                                     decimal.mark = ",", 
+                                     accuracy = 0.01)
+                (NPL),
+                group = Date),
+            position = position_dodge(width = 1),
+            size = 3.0) +
+  scale_fill_manual(values= c("lavender", "purple")) +
+  labs(title = "Weekly NPL Gross Comparison by Island",
+       x = "Island",
+       y = "NPL (%)") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot1.1.b, tooltip = "text") %>% 
+  layout(legend = list(orientation = "h",
+                       y = -0.3))
+```
+This bar chart illustrates the **weekly change in NPL (Non-Performing Loan) Gross percentage** across Indonesia’s islands for **25 October 2025** and **01 November 2025**. The visualization captures how the credit quality shifts regionally over time.
+
+- **Papua** records the **highest NPL levels**, increasing slightly from **20.50%** to **22.80%**.  
+- **Maluku** also shows a noticeable rise, moving from **20.18%** to **22.33%**.  
+- **Kalimantan** stands out with the biggest **decline** from **21.35%** to **18.12%**, suggesting improved credit performance.  
+
+
+## Line 2 (Overview Net)
+### PLOT 1.2.a: (bar plot)
+"Net: Total Outstanding (Current Cut-Off) ~ Pulau vs nilai outstanding amount"
+```{r}
+# Dataset: Net
+sqllab_net_clean
+```
+
+
+```{r}
+# Data Wrangling
+net_total_outstanding <- sqllab_net_clean %>%
+  filter(cut_off_date <= "2025-11-01") %>% 
+  group_by(cut_off_date, island) %>% 
+  summarise(total_outstanding_amount= sum(outstanding_amount)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date)) %>% 
+  mutate(
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>% 
+  head(14) # this and last week
+
+net_total_outstanding
+```
+
+```{r}
+# tooltip
+net_total_outstanding <- net_total_outstanding %>% 
+  mutate(
+    label = glue(
+      "Total Oustanding:IDR {number(total_outstanding_amount, big.mark = '.', decimal.mark = ',', accuracy = 1)}
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+net_total_outstanding
+```
+
+```{r}
+# PLOT 1.2.a: Weekly Net Total Outstanding (Current Cut-Off)
+plot1.2.a <- ggplot(net_total_outstanding, aes(x = island, 
+                    y = total_outstanding_amount,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Date)) +
+  scale_y_continuous(labels = label_number(scale = 1e-9, 
+                                           suffix = "B", 
+                                           accuracy = 1)) +
+  geom_text(aes(y = total_outstanding_amount + 1.2e10,
+                label = format(floor(total_outstanding_amount/1e8)/10,
+                                     big.mark = ".",
+                                     decimal.mark = ","),
+                group = Date),
+            position = position_dodge(width = 1),
+            size = 2.8) +
+  scale_fill_manual(values= c("lavender","purple")) +
+  labs(title = "Weekly Net Total Outstanding",
+       subtitle = "in billion Rupiah", 
+       x = "Island",
+       y = "Total Outstanding",
+       fill = "Date") +
+  theme_minimal() +
+  theme(legend.position = "bottom") 
+
+ggplotly(plot1.2.a, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "Weekly Net Total Outstanding",
+      "<br><sup>in billion Rupiah</sup>")),
+      legend = list(orientation = "h",  
+                    y = -0.3)
+    )
+```
+The bar chart above shows the **Weekly Net Total Outstanding** across **seven islands** in Indonesia, comparing values between **25 Oct 2025** and **01 Nov 2025**. 
+
+- Overall, **Jawa** and **Sumatera** maintain the highest total outstanding amounts, while **Maluku** consistently records the lowest. 
+- Most islands show relatively stable values, with slight decreases observed in **Bali & Nusa Tenggara** and **Sumatera**, and small increases in **Jawa**, **Sulawesi**, and **Papua**.
+
+ 
+### PLOT 1.2.b: (bar plot)
+"Net: Weekly NPL Comparison by Island ~ Island vs NPL"
+```{r}
+# Dataset: Net
+sqllab_net_clean
+```
+
+```{r}
+# category in bucket
+unique(sqllab_net_clean$bucket)
+```
+There are 5 bucket category in the "Net" dataset. 
+Just like the Gross NPL plot, we now need to calculate the Net NPL by obtaining the **total outstanding amount in the “DPD 90+”** bucket and the **overall total outstanding amount** for each cut-off date and island. 
+
+The key difference between **NPL Gross** and **NPL Net** is that the latter **excludes Write-Off (WO)** values. These values will then be used to derive the **Net NPL percentage**.
+
+```{r}
+# Data Wrangling
+# Total amount DPD 90+
+net_DPD_90 <- sqllab_net_clean %>%
+  filter(bucket == "05. 90+ DPD") %>% 
+  group_by(cut_off_date, island) %>% 
+  summarise(DPD_90 = sum(outstanding_amount)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date)) %>% 
+  mutate(
+    date = day(cut_off_date)
+  )
+
+net_DPD_90
+```
+
+```{r}
+# Data Wrangling 2
+# Total Outstanding 2
+net_total_outstanding2 <- sqllab_net_clean %>%
+  group_by(cut_off_date, island) %>% 
+  summarise(total_outstanding_amount= sum(outstanding_amount)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date)) %>% 
+  mutate(
+    date = day(cut_off_date)
+  )
+
+net_total_outstanding2
+```
+
+
+```{r}
+# Merge DPD 90+ outstanding amount with total outstanding amount to calculate current NPL
+net_NPL_Current <- net_DPD_90 %>% 
+  inner_join(net_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    NPL = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01") %>% 
+  head(14) # this and last week
+
+net_NPL_Current
+```
+
+```{r}
+# tooltip
+net_NPL_Current <- net_NPL_Current %>% 
+  mutate(
+    label = glue(
+      "NPL: {number(NPL,  big.mark = '.', decimal.mark = ',', accuracy = 0.01)}%
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+net_NPL_Current
+```
+
+```{r}
+# PLOT 1.2.b: NPL Comparison by Island
+plot1.2.b <- ggplot(net_NPL_Current, aes(x = island, 
+                    y = NPL,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Date)) +
+  geom_text(aes(y = NPL + 0.5,
+                label = label_number(big.mark = ".",
+                                     decimal.mark = ",", 
+                                     accuracy = 0.01)
+                (NPL),
+                group = Date),
+            position = position_dodge(width = 1),
+            size = 3.0) +
+  scale_fill_manual(values= c("lavender", "purple")) +
+  labs(title = "Weekly NPL Net Comparison by Island",
+       x = "Island",
+       y = "NPL (%)") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot1.2.b, tooltip = "text") %>% 
+  layout(legend = list(orientation = "h",
+                       y = -0.3))
+```
+The bar chart above illustrates the **Weekly NPL Net Comparison by Island**, showing changes in **NPL (%)** between **25 Oct 2025** and **01 Nov 2025**. 
+
+- Most islands experience a slight increase in NPL values, with the highest levels observed in **Maluku** and **Bali & Nusa Tenggara**. 
+- Meanwhile, **Sulawesi** and **Sumatera** show stable NPL percentages, indicating consistent credit quality week over week.
+
+
+## Line 3 (Overview External)
+### PLOT 1.3.a: (bar plot)
+"External: Weekly Total Outstanding ~ Island vs Total Outstanding Amount"
+```{r}
+# Dataset: External
+sqllab_external_clean
+```
+
+```{r}
+# Data Wrangling
+external_total_outstanding <- sqllab_external_clean %>%
+  filter(cut_off_date <= "2025-11-01") %>% 
+  group_by(cut_off_date, island) %>% 
+  summarise(total_outstanding_amount= sum(outstanding_amount)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date)) %>% 
+  mutate(
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>% 
+  head(14) # this and last week
+
+external_total_outstanding
+```
+
+```{r}
+# tooltip
+external_total_outstanding <- external_total_outstanding %>% 
+  mutate(
+    label = glue(
+      "Total Oustanding:IDR {number(total_outstanding_amount, big.mark = '.', decimal.mark = ',', accuracy = 1)}
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+external_total_outstanding
+```
+
+```{r}
+# PLOT 1.3 a: Weekly Gross Total Outstanding (Current Cut-Off)
+plot1.3.a <- ggplot(external_total_outstanding, aes(x = island, 
+                    y = total_outstanding_amount,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Date)) +
+  scale_y_continuous(labels = label_number(scale = 1e-9, 
+                                           suffix = "B", 
+                                           accuracy = 1)) +
+  geom_text(aes(y = total_outstanding_amount + 1e10,
+                label = format(floor(total_outstanding_amount/1e8)/10,
+                                     big.mark = ".",
+                                     decimal.mark = ","),
+                group = Date),
+            position = position_dodge(width = 1),
+            size = 2.8) +
+  scale_fill_manual(values= c("lavender","purple")) +
+  labs(title = "Weekly External Total Outstanding",
+       subtitle = "in billion Rupiah", 
+       x = "Island",
+       y = "Total Outstanding",
+       fill = "Date") +
+  theme_minimal() +
+  theme(legend.position = "bottom") 
+
+ggplotly(plot1.3.a, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "Weekly External Total Outstanding",
+      "<br><sup>in billion Rupiah</sup>")),
+      legend = list(orientation = "h",  
+                    y = -0.3)
+    )
+```
+The chart above illustrates the **Weekly External Total Outstanding** across **different islands**, measured in **billion Rupiah**. 
+
+- The comparison between **25 Oct 2025** and **01 Nov 2025** shows relatively stable trends overall, with slight increases observed in **Jawa**, **Kalimantan**, and **Sulawesi**.
+- While **Bali & Nusa Tenggara**, **Maluku**, and **Sumatera** experience minor decreases in total outstanding amounts.
+
+
+### PLOT 1.3.b: (bar plot)
+"External: Weekly NPL Comparison by Island ~ Island vs NPL"
+```{r}
+# Dataset: External
+sqllab_external_clean
+```
+
+```{r}
+# category in bucket
+unique(sqllab_external_clean$bucket)
+```
+There are 5 bucket category in the "External" dataset.
+
+We now need to calculate the External NPL by obtaining the **total outstanding amount in the “DPD 90+”** bucket and the **overall total outstanding amount** for each cut-off date and island. 
+
+The main distinction between **NPL Gross** and **NPL External** is that the latter **excludes both Write-Off (WO) values and Eligible Claim Insurance**. These figures will then be used to derive the **External NPL percentage**.
+
+```{r}
+# Data Wrangling
+# Total amount DPD 90+
+external_DPD_90 <- sqllab_external_clean %>%
+  filter(bucket == "05. 90+ DPD") %>% 
+  group_by(cut_off_date, island) %>% 
+  summarise(DPD_90 = sum(outstanding_amount)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date)) %>% 
+  mutate(
+    date = day(cut_off_date)
+  )
+
+external_DPD_90
+```
+
+```{r}
+# Data Wrangling 2
+# Total Outstanding 2
+external_total_outstanding2 <- sqllab_external_clean %>%
+  group_by(cut_off_date, island) %>% 
+  summarise(total_outstanding_amount= sum(outstanding_amount)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date)) %>% 
+  mutate(
+    date = day(cut_off_date)
+  )
+
+external_total_outstanding2
+```
+
+
+```{r}
+# Merge DPD 90+ outstanding amount with total outstanding amount to calculate current NPL
+external_NPL_Current <- external_DPD_90 %>% 
+  inner_join(external_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    NPL = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01") %>% 
+  head(14) # this and last week
+
+external_NPL_Current
+```
+
+```{r}
+# tooltip
+external_NPL_Current <- external_NPL_Current %>% 
+  mutate(
+    label = glue(
+      "NPL: {number(NPL,  big.mark = '.', decimal.mark = ',', accuracy = 0.01)}%
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+external_NPL_Current
+```
+
+```{r}
+# PLOT 1.3.b: NPL Comparison by Island
+plot1.3.b <- ggplot(external_NPL_Current, aes(x = island, 
+                    y = NPL,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Date)) +
+  geom_text(aes(y = NPL + 0.12,
+                label = label_number(big.mark = ".",
+                                     decimal.mark = ",", 
+                                     accuracy = 0.01)
+                (NPL),
+                group = Date),
+            position = position_dodge(width = 1),
+            size = 3.0) +
+  scale_fill_manual(values= c("lavender", "purple")) +
+  labs(title = "Weekly NPL External Comparison by Island",
+       x = "Island",
+       y = "NPL (%)") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot1.3.b, tooltip = "text") %>% 
+  layout(legend = list(orientation = "h",
+                       y = -0.3))
+```
+The chart above presents the **Weekly NPL External Comparison by Island**, showing the **NPL (%)** for **25 Oct 2025** and **01 Nov 2025**. 
+
+- Overall, **NPL External levels remain relatively stable** across islands, with a noticeable increase in **Bali & Nusa Tenggara**.
+
+
+## Line 4 (Gross, Net, External NPL Weekly Difference)
+
+Now, I’ll create a **plot** to compare the **national NPL** between this week and last week across each **NPL type**.
+
+### PLOT 1.4: (bar plot)
+"Weekly National NPL Comparison by Type"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+```{r}
+# Dataset Gross: DPD 90 & NPL (last 2 weeks) 
+gross_NPL_Current
+```
+
+```{r}
+# Dataset Net: DPD 90 & NPL (last 2 weeks) 
+net_NPL_Current
+```
+
+```{r}
+# Dataset External: DPD 90 & NPL (last 2 weeks) 
+external_NPL_Current
+```
+
+In this step, the Gross, Net, and External NPL datasets are *combined* and *aggregated* at the national level based on each cut-off date. The total outstanding amounts and DPD 90+ values are *calculated* to derive the respective NPL percentages for each type. 
+
+This processed data will then be used to visualize the **Weekly National NPL Comparison by Type**, showing how each NPL category evolves over time.
+
+```{r}
+# Data Wrangling ~> Nationally
+GNE_NPL_current <- gross_NPL_Current %>% 
+  
+  # Merging all current NPL datasets based on cut off date and island
+  inner_join(net_NPL_Current, by= c("cut_off_date", "island")) %>% 
+  inner_join(external_NPL_Current, by = c("cut_off_date", "island")) %>% 
+  
+  group_by(cut_off_date) %>% 
+  summarise(
+    # Aggregating/ summarizing data to national level
+    DPD_90_gross = sum(DPD_90.x),
+    total_outstanding_amount_gross = sum(total_outstanding_amount.x),
+    DPD_90_net = sum(DPD_90.y),
+    total_outstanding_amount_net = sum(total_outstanding_amount.y),
+    DPD_90_external = sum(DPD_90),
+    total_outstanding_amount_external = sum(total_outstanding_amount)
+      ) %>% 
+  ungroup() %>% 
+  
+  mutate(
+    # NPL Gross, Net, and External
+    Gross = round((DPD_90_gross / total_outstanding_amount_gross * 100),2),
+    Net = round((DPD_90_net / total_outstanding_amount_net * 100),2),
+    External = round((DPD_90_external / total_outstanding_amount_external * 100),2),
+    
+    # Date ~> for legend
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>% 
+  
+  select(
+    -c(DPD_90_gross,
+       total_outstanding_amount_gross,
+       DPD_90_net,
+       total_outstanding_amount_net,
+       DPD_90_external,
+       total_outstanding_amount_external)
+  )
+
+GNE_NPL_current
+```
+
+```{r}
+# pivot longer
+GNE_NPL_current <- GNE_NPL_current %>% 
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "NPL_type",
+    values_to = "NPL"
+  ) %>% 
+  mutate(NPL_type = factor(NPL_type, levels = c("Gross", "Net", "External")))
+
+GNE_NPL_current
+```
+
+```{r}
+# tooltip
+GNE_NPL_current <- GNE_NPL_current %>% 
+  mutate(
+    label = glue(
+      "NPL: {number(NPL,  big.mark = '.', decimal.mark = ',', accuracy = 0.01)}%
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+GNE_NPL_current
+```
+
+```{r}
+# PLOT 1.4: Weekly National NPL Comparison by Type
+plot1.4 <- ggplot(GNE_NPL_current, aes(x = NPL_type, 
+                    y = NPL,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Date)) +
+  geom_text(aes(y = NPL + 1.4,
+                label = label_number(big.mark = ".",
+                                     decimal.mark = ",", 
+                                     accuracy = 0.01)
+                (NPL),
+                group = Date),
+            position = position_dodge(width = 1),
+            size = 3.0) +
+  scale_fill_manual(values= c("lavender", "purple")) +
+  labs(title = "Weekly National NPL Comparison by Type",
+       x = "NPL Types",
+       y = "NPL (%)") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot1.4, tooltip = "text") %>% 
+  layout(legend = list(orientation = "h",
+                       y = -0.3))
+```
+The chart above shows the **Weekly National NPL Comparison by Type**, comparing data from **25 Oct 2025** and **01 Nov 2025**. 
+
+- Overall, **Gross and Net NPL** slightly increased from **19.95% to 20.39%** and **10.49% to 10.72%**, respectively, indicating a minor rise in national non-performing loans. 
+- Meanwhile, **External NPL** remained stable at around **2.8%**, suggesting consistent performance in externally financed loans.
+
+By definition, **Gross NPL** will always be higher than **Net NPL**, and **Net NPL** will always be higher than **External NPL**. This is because **Net NPL** excludes loans that have been written off, while **External NPL** further excludes loans covered by eligible claim assurances.
+
+
+## Line 5 (Weekly Net NPL Comparison & DPD 90+ Difference)
+### PLOT 1.5: (bar plot)
+"Net NPL Weekly Comparison"
+```{r}
+# Net Dataset
+sqllab_net_clean
+```
+
+```{r}
+# Dataset Net: DPD 90 & NPL (last 2 weeks) 
+net_NPL_Current
+```
+
+Now, we need to *aggregate* the Net NPL data on a weekly basis by *summing* the DPD 90+ and total outstanding amounts for each cut-off date. 
+
+The weekly Net NPL percentage is then *calculated*, *rounded* to two decimal places, and *arranged* chronologically to prepare for visualization.
+```{r}
+# Data Wrangling
+net_NPL_weekly_comparison <- net_NPL_Current %>% 
+  group_by(cut_off_date) %>% 
+  summarise(NPL_weekly = (sum(DPD_90)/sum(total_outstanding_amount))*100) %>%
+  ungroup() %>% 
+  mutate(
+    NPL_weekly = round(NPL_weekly,2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)), "%d %b %Y"))
+  ) %>% 
+  arrange(desc(cut_off_date))
+
+net_NPL_weekly_comparison
+```
+
+
+```{r}
+# tooltip
+net_NPL_weekly_comparison <- net_NPL_weekly_comparison %>% 
+  mutate(
+    label = glue(
+      "NPL: {number(NPL_weekly,  big.mark = '.', decimal.mark = ',', accuracy = 0.01)}%
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+net_NPL_weekly_comparison
+```
+
+```{r}
+# PLOT 1.5: NPL Net Weekly Comparison
+plot1.5 <- ggplot(net_NPL_weekly_comparison, aes(x = Date, 
+                    y = NPL_weekly,
+                    text = label)) +
+  
+  geom_col(position = "dodge", aes(fill = Date)) +
+  scale_fill_manual(values= c("lavender", "purple")) +
+  geom_text(aes(y = NPL_weekly + 0.3,
+                label = label_number(big.mark = ".",
+                                     decimal.mark = ",", 
+                                     accuracy = 0.01)
+                (NPL_weekly),
+                group = Date),
+            size = 3.5)  +
+  labs(title = "NPL Net Weekly Comparison",
+       x = "Cut Off Date",
+       y = "NPL (%)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggplotly(plot1.5, tooltip = "text")
+```
+The chart shows the **Net NPL** percentage comparison between **25 October 2025** and **01 November 2025**.  
+
+- There is a slight **increase** in NPL from **10.49%** to **10.72%**, indicating a **0.23 percentage point rise** in the weekly NPL rate.
+
+### Difference Net NPL Weekly in Detail (%)
+"Difference Net NPL Weekly in Detail"
+```{r}
+# Net NPL Last two weeks
+net_NPL_weekly_comparison
+```
+
+```{r}
+# Difference NPL in %
+net_Diff_NPL_Weekly <- net_NPL_weekly_comparison %>%
+  summarise(NPL_diff = NPL_weekly[1] - NPL_weekly[2],
+            NPL_diff = if_else(
+              NPL_diff >0,
+              paste0("+", format(round(NPL_diff, 2), big.mark = ".", decimal.mark = ",", nsmall = 2), "%"), # if condition
+      paste0(format(round(NPL_diff, 2), big.mark = ".", decimal.mark = ",", nsmall = 2), "%") # else condition
+            ))
+
+net_Diff_NPL_Weekly
+```
+
+### Difference Net DPD 90+ in Rp
+```{r}
+# Net Dataset
+sqllab_net_clean
+```
+
+
+```{r}
+# Dataset Net: DPD 90 & NPL (last 2 weeks) 
+net_NPL_Current
+```
+
+
+```{r}
+# Total DPD 90+ outstanding amount last 2 weeks
+net_Diff_DPD90_weekly <- net_NPL_Current %>% 
+  group_by(cut_off_date) %>% 
+  summarise(Total_DPD_90_weekly = sum(DPD_90)) %>% 
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+net_Diff_DPD90_weekly
+```
+
+```{r}
+# Difference Net DPD 90+ in Rp
+net_Diff_DPD90_weekly <- net_Diff_DPD90_weekly %>% 
+  summarise(Diff_DPD90_weekly= Total_DPD_90_weekly[1]-Total_DPD_90_weekly[2],
+            Diff_DPD90_weekly = if_else(
+              Diff_DPD90_weekly >0,
+              paste0(" + IDR ", comma(Diff_DPD90_weekly)), # ini if-nya
+              paste0(" - IDR ", comma(Diff_DPD90_weekly * (-1))) # ini else-nya
+            ),
+            
+            Diff_DPD90_weekly = gsub(",", ".", Diff_DPD90_weekly),  # change thousand sep to "."
+    Diff_DPD90_weekly = sub("\\.(\\d{2})$", ",\\1", Diff_DPD90_weekly) # change decimal sep to ","
+    ) 
+
+net_Diff_DPD90_weekly
+```
+
+
+## Line 6 (Gross, Net, and External NPL Trends Over the Last 8 Weeks)
+
+Next, I’ll create a **line plot** to visualize the **national NPL** trend over the last 8 weeks across each NPL type (`Gross`, `Net`, and `External`).
+
+### PLOT 1.6: (line plot)
+"Last 8 Weeks NPL Position ~ Date vs NPL (%)"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+```{r}
+# Dataset DPD 90: Gross, Net, and External 
+gross_DPD_90
+net_DPD_90
+external_DPD_90
+```
+
+
+```{r}
+# Dataset Total Outstanding (all buckets): Gross, Net, and External 
+gross_total_outstanding2
+net_total_outstanding2
+external_total_outstanding2
+```
+
+Now, we’re going to calculate the *Gross NPL value* for each *island* across every *cut-off date*.
+```{r}
+# Data Wrangling: Gross NPL for each island & cut off date
+gross_NPL_last_8_weeks <- gross_DPD_90 %>% 
+  inner_join(gross_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    Gross = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01") 
+
+gross_NPL_last_8_weeks
+```
+
+After obtaining each *island* and *cut-off date’s Gross NPL value*, we now calculate the *overall national Gross NPL* by *grouping the data* based on the *cut-off date*, then *summing all DPD 90+ values* and *dividing them by the total outstanding amounts*. This process results in the *national Gross NPL value* for each *cut-off date*.
+```{r}
+# National Gross NPL value for each cut off date
+gross_NPL_last_8_weeks <- gross_NPL_last_8_weeks %>%
+  group_by(cut_off_date) %>% 
+  summarise(Gross= round((sum(DPD_90)/sum(total_outstanding_amount)*100),2)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+gross_NPL_last_8_weeks
+```
+
+Now, we’re going to calculate the *Net NPL value* for each *island* across every *cut-off date*.
+```{r}
+# Data Wrangling: Net NPL for each island & cut off date
+net_NPL_last_8_weeks <- net_DPD_90 %>% 
+  inner_join(net_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    Net = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01")
+
+net_NPL_last_8_weeks
+```
+
+We perform the same process for the Net dataset to derive the *national Net NPL value* for each *cut-off date*.
+```{r}
+# National Net NPL value for each cut off date 
+net_NPL_last_8_weeks <- net_NPL_last_8_weeks %>%
+  group_by(cut_off_date) %>% 
+  summarise(Net= round((sum(DPD_90)/sum(total_outstanding_amount)*100),2)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+net_NPL_last_8_weeks
+```
+
+Now, we’re going to calculate the *External NPL value* for each *island* across every *cut-off date*.
+```{r}
+# Data Wrangling: External NPL for each island & cut off date
+external_NPL_last_8_weeks <- external_DPD_90 %>% 
+  inner_join(external_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    External = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01")
+
+external_NPL_last_8_weeks
+```
+
+Lastly, we perform the same process for the External dataset to derive the *national External NPL value* for each *cut-off date*.
+```{r}
+# National External NPL value for each cut off date
+external_NPL_last_8_weeks <- external_NPL_last_8_weeks %>%
+  group_by(cut_off_date) %>% 
+  summarise(External= round((sum(DPD_90)/sum(total_outstanding_amount)*100),2)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+external_NPL_last_8_weeks
+```
+
+After obtaining the **Gross**, **Net**, and **External national NPL values** for the last **8 weeks**, we need to **merge them into a single dataset** to make it neater and compare in the next step.
+```{r}
+# Merging Gross, Net, and External national NPL values into one dataset
+GNE_NPL_last_8_weeks <- gross_NPL_last_8_weeks %>% 
+  inner_join(net_NPL_last_8_weeks, by = c("cut_off_date")) %>%
+  inner_join(external_NPL_last_8_weeks, by = c("cut_off_date")) %>% 
+  mutate(
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  arrange(desc(cut_off_date))  
+
+GNE_NPL_last_8_weeks
+```
+
+Next, it's time to **pivot the dataset** to make it easier to visualize.  
+
+Since we only want to focus on the **national NPL data for the last 8 weeks**, we will keep only the **top 24 observations**, representing **3 NPL types × 8 weeks = 24 data points**.
+```{r}
+# Pivot and taking the last 8 weeks national NPL values
+GNE_NPL_last_8_weeks <- GNE_NPL_last_8_weeks %>% 
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "NPL_type",
+    values_to = "NPL"
+  ) %>% 
+  mutate(NPL_type = factor(NPL_type, levels = c("Gross", "Net", "External"))) %>% 
+  head(24)
+
+GNE_NPL_last_8_weeks
+```
+
+```{r}
+# tooltip
+GNE_NPL_last_8_weeks <- GNE_NPL_last_8_weeks %>% 
+  mutate(
+    label = glue(
+      "NPL: {number(NPL,  big.mark = '.', decimal.mark = ',', accuracy = 0.01)}%
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+GNE_NPL_last_8_weeks
+```
+
+```{r}
+# PLOT 1.6: Last 8 Weeks NPL Position by Type
+plot1.6 <- ggplot(GNE_NPL_last_8_weeks, aes(x = cut_off_date, 
+                    y = NPL,
+                    color = NPL_type,
+                    group = NPL_type,
+                    text = label)) +
+  
+  geom_point() +
+  geom_line() +
+  geom_text(aes(y = NPL + 1.5,
+                label = label_number(big.mark = ".",
+                                     decimal.mark = ",", 
+                                     accuracy = 0.01)
+                (NPL)),
+            size = 3) +
+  scale_x_date(
+    breaks = GNE_NPL_last_8_weeks$cut_off_date, 
+    date_labels = "%b %d"
+  ) +
+  scale_y_continuous(
+    limits = c(0, max(GNE_NPL_last_8_weeks$NPL) + 10),
+    breaks = seq(0,100,5)
+  ) +
+  scale_color_manual(values = c(
+    "Gross" = "darkgreen",
+    "Net" = "red",
+    "External" = "blue"),
+    name = NULL) +
+  labs(title = "Last 8 Weeks NPL Position by Type",
+       x = "Cut Off Date",
+       y = "NPL (%)",
+       color = "NPL Type") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot1.6, tooltip = "text") %>% 
+  layout(legend = list(
+    orientation = "h",
+    y = -0.3
+  ))
+```
+The chart presents the **NPL** trend over the **last 8 weeks**, separated by **Gross**, **Net**, and **External** types.  
+
+- **Gross NPL** remained relatively stable, fluctuating slightly between **19.01%** and **20.88%**, ending at **20.39%** on **1 November 2025**.  
+- **Net NPL** showed minor variation, with a low of **9.89%** and peaking at **10.96%**, finishing at **10.72%**.  
+- **External NPL** stayed consistently low, ranging from **2.58%** to **2.87%**, ending at **2.82%**.  
+
+Overall, the **NPL levels remained steady** across all types, with **Net and Gross NPL** showing a slight **upward movement** toward the end of the period.
+
+
+## Line 7 (Gross, Net, and External NPL Trends Over the Last 4 Months)
+
+Next, I’ll create a **line plot** to visualize the **national NPL trend** over the last 4 months by using the latest recorded cut-off date from each month across all NPL types (`Gross`, `Net`, and `External`).
+
+### PLOT 1.7: (line plot)
+"Last 4 Months NPL Position ~ Date vs NPL (%)"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+The same as the previous step, firstly, we’re going to calculate the *Gross NPL value* for each *island* across every *cut-off date*.
+```{r}
+# Data Wrangling: Gross NPL for each island & cut off date
+gross_NPL_last_4_months <- gross_DPD_90 %>% 
+  inner_join(gross_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    Gross = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01") 
+
+gross_NPL_last_4_months
+```
+
+Then, we derive the *national Gross NPL value* for each *cut-off date*.
+```{r}
+# National Gross NPL value for each cut off date
+gross_NPL_last_4_months <- gross_NPL_last_4_months %>%
+  group_by(cut_off_date) %>% 
+  summarise(Gross= round((sum(DPD_90)/sum(total_outstanding_amount)*100),2)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+gross_NPL_last_4_months
+```
+
+The same as the Gross dataset, we’re going to calculate the *Net NPL value* for each *island* across every *cut-off date*.
+```{r}
+# Data Wrangling: Net NPL for each island & cut off date
+net_NPL_last_4_months <- net_DPD_90 %>% 
+  inner_join(net_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    Net = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01")
+
+net_NPL_last_4_months
+```
+
+Then, we derive the *national Net NPL value* for each *cut-off date*.
+```{r}
+# National Net NPL value for each cut off date
+net_NPL_last_4_months <- net_NPL_last_4_months %>%
+  group_by(cut_off_date) %>% 
+  summarise(Net= round((sum(DPD_90)/sum(total_outstanding_amount)*100),2)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+net_NPL_last_4_months
+```
+
+Lastly, we’re going to calculate the *External NPL value* for each *island* across every *cut-off date*.
+```{r}
+# Data Wrangling: External NPL for each island & cut off date
+external_NPL_last_4_months <- external_DPD_90 %>% 
+  inner_join(external_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    External = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01")
+
+external_NPL_last_4_months
+```
+
+We also derive the *national External NPL value* for each *cut-off date*.
+```{r}
+# National External NPL value for each cut off date
+external_NPL_last_4_months <- external_NPL_last_4_months %>%
+  group_by(cut_off_date) %>% 
+  summarise(External= round((sum(DPD_90)/sum(total_outstanding_amount)*100),2)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+external_NPL_last_4_months
+```
+
+We also need to **merge all the Gross, Net, and External NPL values into a single dataset** to make it neater for the next step.
+```{r}
+# Merging Gross, Net, and External national NPL values into one dataset
+GNE_NPL_last_4_months <- gross_NPL_last_4_months %>%
+  inner_join(net_NPL_last_4_months, by = c("cut_off_date")) %>%
+  inner_join(external_NPL_last_4_months, by = c("cut_off_date")) %>% 
+  mutate(
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  arrange(desc(cut_off_date))  
+
+GNE_NPL_last_4_months
+```
+
+Now, we want to **obtain the national NPL values for the last 4 months**.  
+
+To take the NPL values from the **last cut-off date of each month**, we first need to **add separate columns for date, month, and year** based on the existing **cut-off date**.
+```{r}
+# Adding date, month, and year column
+GNE_NPL_last_4_months <- GNE_NPL_last_4_months %>% 
+  mutate(
+    date = day(cut_off_date),
+    month = floor_date(cut_off_date, "month"),
+    year = year(cut_off_date)
+    ) %>% 
+  arrange(desc(cut_off_date))
+
+GNE_NPL_last_4_months
+```
+
+Then, we only need to **select the maximum cut-off date for each month**, and **filter the data to include only the last 4 months**.
+```{r}
+# Retrieve the maximum date from each month and filter only for the last 4 months
+GNE_NPL_last_4_months <- GNE_NPL_last_4_months %>%
+  group_by(month) %>% 
+  filter(cut_off_date <= "2025-11-01") %>% 
+  filter(date == max(date)) %>% 
+  ungroup() %>% 
+  head(4)
+
+GNE_NPL_last_4_months
+```
+Next, it's time to **pivot the dataset** to make it easier to visualize.  
+```{r}
+# Pivot and adding NPL type column 
+GNE_NPL_last_4_months <- GNE_NPL_last_4_months %>% 
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "NPL_type",
+    values_to = "NPL"
+  ) %>% 
+  mutate(NPL_type = factor(NPL_type, levels = c("Gross", "Net", "External"))) 
+
+GNE_NPL_last_4_months
+```
+
+```{r}
+# tooltip
+GNE_NPL_last_4_months <- GNE_NPL_last_4_months %>% 
+  mutate(
+    label = glue(
+      "NPL: {number(NPL,  big.mark = '.', decimal.mark = ',', accuracy = 0.01)}%
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}"
+    )
+  )
+GNE_NPL_last_4_months
+```
+
+```{r}
+# PLOT 1.7: Last 4 Months NPL Position by Type
+plot1.7 <- ggplot(GNE_NPL_last_4_months, aes(x = cut_off_date, 
+                    y = NPL,
+                    color = NPL_type,
+                    group = NPL_type,
+                    text = label)) +
+  
+  geom_point() +
+  geom_line() +
+  geom_text(aes(y = NPL + 1.5,
+                label = label_number(big.mark = ".",
+                                     decimal.mark = ",", 
+                                     accuracy = 0.01)
+                (NPL)),
+            size = 3) +
+  scale_x_date(
+    breaks = GNE_NPL_last_4_months$cut_off_date, 
+    date_labels = "%b %d"
+  ) +
+  scale_y_continuous(
+    limits = c(0, max(GNE_NPL_last_4_months$NPL) + 10),
+    breaks = seq(0,100,5)
+  ) +
+  scale_color_manual(values = c(
+    "Gross" = "darkgreen",
+    "Net" = "red",
+    "External" = "blue"),
+    name = NULL) +
+  labs(title = "Last 4 Months NPL Position by Type",
+       x = "Cut Off Date",
+       y = "NPL (%)",
+       color = "NPL Type") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot1.7, tooltip = "text") %>% 
+  layout(legend = list(
+    orientation = "h",
+    y = -0.3
+  ))
+```
+The chart illustrates the **NPL** trend over the **past 4 months** for **Gross**, **Net**, and **External** portfolios. 
+
+- **Gross NPL** remained relatively stable, moving slightly from **20.22% (Aug 30)** to **20.39% (Nov 1)**.  
+- **Net NPL** showed a mild decline from **10.70%** in **August** to **10.49%** in **September**, before rising again to **10.72%** in **November**.  
+- **External NPL** stayed consistently low and stable, ranging narrowly between **2.75%** and **2.84%**.  
+
+Overall, **Gross and Net NPLs** indicate **minor fluctuations** but no significant changes, suggesting **portfolio quality remained steady** throughout the observed period.
+
+
+##Line 8 (Gross, Net, and External NPL Trends Over the Last 4 Quartals)
+
+Next, I’ll create a **line plot** to visualize the **national NPL trend** over the last 4 quarters using the latest recorded cut-off date from each quarter across all NPL types (`Gross`, `Net`, and `External`).
+
+###PLOT 1.8: (line plot)
+"Last 4 Quartal ~ Date vs NPL (%)"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+Now, to create a plot for the last 4 quarters, we need to perform the same data wrangling process for the Gross, Net, and External datasets as we did previously.
+```{r}
+# Data Wrangling: Gross NPL for each island & cut off date
+gross_NPL_last_4_quartals <- gross_DPD_90 %>% 
+  inner_join(gross_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    Gross = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01") 
+
+gross_NPL_last_4_quartals
+```
+
+```{r}
+# National Gross NPL value for each cut off date
+gross_NPL_last_4_quartals <- gross_NPL_last_4_quartals %>%
+  group_by(cut_off_date) %>% 
+  summarise(Gross= round((sum(DPD_90)/sum(total_outstanding_amount)*100),2)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+gross_NPL_last_4_quartals
+```
+
+```{r}
+# Data Wrangling: Net NPL for each island & cut off date
+net_NPL_last_4_quartals <- net_DPD_90 %>% 
+  inner_join(net_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    Net = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01")
+
+net_NPL_last_4_quartals
+```
+
+```{r}
+# National Net NPL value for each cut off date
+net_NPL_last_4_quartals <- net_NPL_last_4_quartals %>%
+  group_by(cut_off_date) %>% 
+  summarise(Net= round((sum(DPD_90)/sum(total_outstanding_amount)*100),2)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+net_NPL_last_4_quartals
+```
+
+```{r}
+# Data Wrangling: External NPL for each island & cut off date
+external_NPL_last_4_quartals <- external_DPD_90 %>% 
+  inner_join(external_total_outstanding2, by = c("cut_off_date", "island")) %>% 
+  mutate(
+    External = round((DPD_90 / total_outstanding_amount * 100),2),
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  select (-c(date.x, date.y)) %>% 
+  arrange(desc(cut_off_date)) %>%
+  filter(cut_off_date <= "2025-11-01")
+
+external_NPL_last_4_quartals
+```
+
+```{r}
+# National External NPL value for each cut off date
+external_NPL_last_4_quartals <- external_NPL_last_4_quartals %>%
+  group_by(cut_off_date) %>% 
+  summarise(External= round((sum(DPD_90)/sum(total_outstanding_amount)*100),2)) %>%
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+external_NPL_last_4_quartals
+```
+
+After obtaining the **Gross**, **Net**, and **External national NPL values**. We need to **merge them into a single dataset** to make it neater for the next step.
+```{r}
+# Merging Gross, Net, and External national NPL values into one dataset
+GNE_NPL_last_4_quartals <- gross_NPL_last_4_quartals %>%
+  inner_join(net_NPL_last_4_quartals, by = c("cut_off_date")) %>%
+  inner_join(external_NPL_last_4_quartals, by = c("cut_off_date")) %>% 
+  mutate(
+    Date = factor(
+      format(cut_off_date, "%d %b %Y"),
+      levels = format(sort(unique(cut_off_date)),"%d %b %Y"))
+  ) %>%
+  arrange(desc(cut_off_date))  
+
+GNE_NPL_last_4_quartals
+```
+
+Now, we want to specifically **get the national NPL values for the last 4 quartals**.  
+
+To take the NPL values from the **last cut-off date of each quartals**, we first need to **add separate columns for date, month, and year** based on the existing **cut-off date**.
+```{r}
+# Adding date, month, and year column
+GNE_NPL_last_4_quartals <- GNE_NPL_last_4_quartals %>% 
+  mutate(
+    date = day(cut_off_date),
+    month = floor_date(cut_off_date, "month"),
+    year = year(cut_off_date)
+    ) %>% 
+  arrange(desc(cut_off_date))
+
+GNE_NPL_last_4_quartals
+```
+
+To identify the *quarter* of each *cut-off date*, we’ll create a *function* that labels it according to its *month*.
+```{r}
+# Function to determine Q1–Q4: Quarter
+quartal <- function(x)
+  {
+  if(x == 3)
+    {
+    z <- "Q1" # returns "Q1" if the value of x is 3 (March)
+    }
+  else if(x == 6)
+    {
+    z <- "Q2" # returns "Q2" if the value of x is 6 (June)
+    }
+  else if(x == 9)
+    {
+    z <- "Q3" # returns "Q3" if the value of x is 9 (September)
+    }
+  else
+    {
+    z <- "Q4" # returns "Q4" if the value of x is 12 (December)
+    }
+  }
+```
+
+```{r}
+# Example: trying out the "quartal" function above
+print(quartal(6))
+```
+When the input value is 6 (June), the function correctly returns Q2, which represents the second quarter.
+
+Now, we need to *apply the Quartal function* to identify which quarter each cut-off date belongs to. We will then *filter the dataset* to include only the months *March (3), June (6), September (9),* and *December (12)* to ensure that only the end-of-quarter data is used.
+
+We also want to make sure to *include only the maximum date of each quarter* and *take only the most recent year*, ensuring that we are using *the latest available quarterly data*.
+```{r}
+# Applying the Quartal function to extract only the most recent date from each quarter
+GNE_NPL_last_4_quartals <- GNE_NPL_last_4_quartals %>% 
+  mutate(
+    month_num = month(cut_off_date),
+    quartal = sapply(month_num, quartal)
+  ) %>% 
+  filter(cut_off_date <= "2025-11-01") %>% 
+  filter(
+    month_num %in% c("3", "6", "9", "12"),
+  ) %>% 
+  group_by(quartal) %>% 
+  filter(year == max(year)) %>% 
+  group_by(month_num) %>% 
+  filter(date == max(date)) %>% 
+  ungroup() %>% 
+  arrange(desc(cut_off_date))
+
+GNE_NPL_last_4_quartals
+```
+Next, it's time to **pivot the dataset** to make it easier to visualize.  
+```{r}
+# Pivot and adding NPL type column 
+GNE_NPL_last_4_quartals <- GNE_NPL_last_4_quartals %>% 
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "NPL_type",
+    values_to = "NPL"
+  ) %>% 
+  mutate(NPL_type = factor(NPL_type, levels = c("Gross", "Net", "External"))) 
+
+GNE_NPL_last_4_quartals
+```
+
+
+```{r}
+# tooltip
+GNE_NPL_last_4_quartals <- GNE_NPL_last_4_quartals %>% 
+  mutate(
+    label = glue(
+      "NPL: {number(NPL,  big.mark = '.', decimal.mark = ',', accuracy = 0.01)}%
+      Cut Off Date: {format(as.Date(cut_off_date), '%d %b %Y')}
+      Quarter: {quartal}"
+    )
+  )
+GNE_NPL_last_4_quartals
+```
+
+```{r}
+# PLOT 1.8: Last 4 Quartals NPL Position by Type
+plot1.8 <- ggplot(GNE_NPL_last_4_quartals, aes(x = reorder(quartal, month), 
+                    y = NPL,
+                    color = NPL_type,
+                    group = NPL_type,
+                    text = label)) +
+  
+  geom_point() +
+  geom_line() +
+  geom_text(aes(y = ifelse(NPL_type == "External", NPL - 1.5, NPL + 1.5),
+                label = label_number(big.mark = ".",
+                                     decimal.mark = ",", 
+                                     accuracy = 0.01)
+                (NPL)),
+            size = 3) +
+  scale_y_continuous(
+    limits = c(0, max(GNE_NPL_last_4_quartals$NPL) + 10),
+    breaks = seq(0,100,5)
+  ) +
+  scale_color_manual(values = c(
+    "Gross" = "darkgreen",
+    "Net" = "red",
+    "External" = "blue"),
+    name = NULL) +
+  labs(title = "Last 4 Quartals NPL Position by Type",
+       x = "Cut Off Date",
+       y = "NPL (%)",
+       color = "NPL Type") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot1.8, tooltip = "text") %>% 
+  layout(legend = list(
+    orientation = "h",
+    y = -0.3
+  ))
+```
+The chart presents the **NPL** trend over the **last four quartals**, comparing **Gross**, **Net**, and **External** NPL ratios.
+
+- **Gross NPL** shows a gradual increase from **19.64% (Q4)** to **20.49% (Q2)** before slightly easing to **20.11% (Q3)**, indicating **a generally stable performance** across the period.  
+- **Net NPL** rose from **10.23%** in **Q4** to **10.70%** in **Q2**, followed by a marginal decline to **10.49%** in **Q3**, reflecting **minor fluctuation but consistent control of credit quality**.  
+- **External NPL** remained **very stable**, moving slightly from **2.68%** to **2.85%**, then closing at **2.84%**, suggesting **strong management of external exposures**.  
+
+Overall, **all three NPL categories** maintained **steady positions**, with only slight movements across the quartals—implying **consistent portfolio quality and controlled risk levels**.
+
+
+# TAB 2 (DPD BUCKET OVERVIEW)
+## Section 1 (DPD Bucket by Amount)
+
+Now, I’m going to create **bar plots** to visualize the **total outstanding amount** across islands for each **DPD bucket**. These visualizations provide a clearer overview of outstanding loan distribution within the `Gross`, `Net`, and `External` datasets, making the comparison across islands and bucket categories easier to interpret.
+
+The main goals of these plots are to:
+
+- Compare the **total outstanding amount** across `Gross`, `Net`, and `External` datasets.  
+- Identify which islands have the **highest** and **lowest outstanding amounts** within each DPD bucket.  
+- Analyze the **distribution of outstanding balances** across islands and bucket categories.
+- Highlight the `DPD 90+` bucket to identify islands with higher levels of **overdue or unpaid loans**.
+
+### PLOT 2.1: (bar plot)
+"DPD Bucket by Amount (02. 1-30 DPD) ~ Total Outstanding vs Island"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+Now, we're going to derive the latest *outstanding amount* from the *gross dataset*, specifically for the *“02. 1–30 DPD”* bucket in each island.
+```{r}
+# Gross: Outstanding amount for "02. DPD 1-30" bucket
+DPD_bucket_by_amount02_gross <- sqllab_gross_clean %>% 
+  filter(bucket == "02. 1-30 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount02_gross
+```
+
+We're also going to derive the latest *outstanding amount* from the *net and external dataset*, specifically for the *“02. 1–30 DPD”* bucket in each island.
+```{r}
+# Net: Outstanding amount for "02. DPD 1-30" bucket
+DPD_bucket_by_amount02_net <- sqllab_net_clean %>% 
+  filter(bucket == "02. 1-30 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount02_net
+```
+
+```{r}
+# External: Outstanding amount for "02. DPD 1-30" bucket
+DPD_bucket_by_amount02_external <- sqllab_external_clean %>% 
+  filter(bucket == "02. 1-30 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount02_external
+```
+
+After obtaining the latest *Gross, Net, and External outstanding amounts*, specifically for the *“02. 1–30 DPD”* bucket in each island, we're going to *merge* and *pivot* them into one dataset for easier visualization.
+```{r}
+# Merging Gross, Net, and External "02. DPD 1-30" bucket outstanding amounts into one dataset
+DPD_bucket_by_amount02 <- DPD_bucket_by_amount02_gross %>% 
+  inner_join(DPD_bucket_by_amount02_net, by = "island") %>% 
+  inner_join(DPD_bucket_by_amount02_external, by = "island") %>% 
+  rename(
+    Gross = outstanding_amount.x,
+    Net = outstanding_amount.y,
+    External = outstanding_amount
+  )
+
+DPD_bucket_by_amount02
+```
+
+```{r}
+# Pivot and adding NPL type column 
+DPD_bucket_by_amount02 <- DPD_bucket_by_amount02 %>%
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "Type",
+    values_to = "Total_OS"
+  ) %>% 
+  mutate(Type = factor(Type, levels = c("Gross", "Net", "External")))
+  
+DPD_bucket_by_amount02
+```
+
+```{r}
+# tooltip
+DPD_bucket_by_amount02 <- DPD_bucket_by_amount02 %>%
+  mutate(
+    label = glue(
+      "Total Oustanding:IDR {number(Total_OS, big.mark = '.', decimal.mark = ',', accuracy = 1)}"
+    )
+  )
+
+DPD_bucket_by_amount02
+```
+
+```{r}
+# PLOT 2.1: DPD Bucket by Amount (02. 1-30 DPD)
+plot2.1 <- ggplot(DPD_bucket_by_amount02, aes(x = island, 
+                    y = Total_OS,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Type)) +
+  geom_text(aes(y = Total_OS + 2.5e9,
+                label = format(floor(Total_OS/1e8)/10,
+                                     big.mark = ".",
+                                     decimal.mark = ","),
+                group = Type),
+            position = position_dodge(width = 1),
+            size = 3) +
+  scale_y_continuous(labels = label_number(scale = 1e-9, 
+                                           suffix = "B", 
+                                           accuracy = 1)) +
+  scale_fill_manual(values = c("darkgreen", "red","blue"),
+                    name = NULL) +
+  labs(title = "DPD 1-30",
+       x = "Island",
+       y = "Total Outstanding") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot2.1, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "DPD 1-30",
+      "<br><sup>in billion Rupiah</sup>")),
+      legend = list(orientation = "h",
+                    y = -0.3))
+```
+The chart shows the **total outstanding DPD 1–30 (in billion Rupiah)** across different islands, comparing **Gross**, **Net**, and **External** figures.
+
+- **Sumatera** recorded the **highest exposure**, with **Gross 92.9B**, **Net 71.1B**, and **External 58.4B**, indicating the largest loan volume in early delinquency.  
+- **Jawa** and **Sulawesi** followed, showing **Gross 56.1B** and **55.3B** respectively, suggesting significant portfolio size but still well-managed within the early DPD category.  
+- **Kalimantan** and **Papua** maintained moderate levels, with **Gross around 50.6B** and **45.4B**, while **Bali & Nusa Tenggara** and **Maluku** reported relatively **lower exposures**.  
+
+Overall, the **Gross DPD 1–30 remains consistently higher** than Net and External across all islands, reflecting **expected write-off and collection adjustments** in later stages.
+
+
+### PLOT 2.2: (bar plot)
+"DPD Bucket by Amount (03. 31-60 DPD) ~ Total Outstanding vs Island"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+Now, we're going to derive the latest *outstanding amount* from the *gross dataset*, specifically for the *“03. 31–60 DPD”* bucket in each island.
+```{r}
+# Gross: Outstanding amount for "03. DPD 31-60" bucket
+DPD_bucket_by_amount03_gross <- sqllab_gross_clean %>% 
+  filter(bucket == "03. 31-60 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount03_gross
+```
+
+We're also going to derive the latest *outstanding amount* from the *net and external dataset*, specifically for the *“03. 31–60 DPD”* bucket in each island.
+```{r}
+# Net: Outstanding amount for "03. DPD 31-60" bucket
+DPD_bucket_by_amount03_net <- sqllab_net_clean %>% 
+  filter(bucket == "03. 31-60 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount03_net
+```
+
+```{r}
+# External: Outstanding amount for "03. DPD 31-60" bucket
+DPD_bucket_by_amount03_external <- sqllab_external_clean %>% 
+  filter(bucket == "03. 31-60 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount03_external
+```
+
+Like the previous example, we’re now going to *merge* and *pivot* the data into a single dataset for easier visualization.
+```{r}
+# Merging Gross, Net, and External "03. DPD 31-60" bucket outstanding amounts into one dataset
+DPD_bucket_by_amount03 <- DPD_bucket_by_amount03_gross %>% 
+  inner_join(DPD_bucket_by_amount03_net, by = "island") %>% 
+  inner_join(DPD_bucket_by_amount03_external, by = "island") %>% 
+  rename(
+    Gross = outstanding_amount.x,
+    Net = outstanding_amount.y,
+    External = outstanding_amount
+  )
+
+DPD_bucket_by_amount03
+```
+
+```{r}
+# Pivot and adding NPL type column 
+DPD_bucket_by_amount03 <- DPD_bucket_by_amount03 %>%
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "Type",
+    values_to = "Total_OS"
+  ) %>% 
+  mutate(Type = factor(Type, levels = c("Gross", "Net", "External")))
+  
+DPD_bucket_by_amount03
+```
+
+```{r}
+# tooltip
+DPD_bucket_by_amount03 <- DPD_bucket_by_amount03 %>%
+  mutate(
+    label = glue(
+      "Total Oustanding:IDR {number(Total_OS, big.mark = '.', decimal.mark = ',', accuracy = 1)}"
+    )
+  )
+
+DPD_bucket_by_amount03
+```
+
+```{r}
+# PLOT 2.2: DPD Bucket by Amount (03. 31-60 DPD)
+plot2.2 <- ggplot(DPD_bucket_by_amount03, aes(x = island, 
+                    y = Total_OS,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Type)) +
+  geom_text(aes(y = Total_OS + 2.5e9,
+                label = format(floor(Total_OS/1e8)/10,
+                                     big.mark = ".",
+                                     decimal.mark = ","),
+                group = Type),
+            position = position_dodge(width = 1),
+            size = 3) +
+  scale_y_continuous(labels = label_number(scale = 1e-9, 
+                                           suffix = "B", 
+                                           accuracy = 1)) +
+   scale_fill_manual(values = c("darkgreen", "red","blue"),
+                    name = NULL) +
+  labs(title = "DPD 31-60",
+       x = "Island",
+       y = "Total Outstanding") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot2.2, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "DPD 31-60",
+      "<br><sup>in billion Rupiah</sup>")),
+      legend = list(orientation = "h",
+                    y = -0.3))
+```
+The chart shows **Total Outstanding (in billion Rupiah)** for **DPD 31–60** across different **islands** in Indonesia, categorized into **Gross**, **Net**, and **External** values.
+
+- **Sumatera** has the highest outstanding amounts across all categories, reaching **93.9B Gross**, **69.8B Net**, and **57.4B External**.  
+- **Jawa** and **Sulawesi** follow with relatively high totals, while **Maluku** records the lowest with **16.3B Gross**.  
+- Across all islands, **Gross values** consistently exceed **Net** and **External**, indicating deductions or adjustments between categories.  
+- Overall, the data suggests a concentration of higher DPD 31–60 exposures in **Sumatera**, **Jawa**, and **Sulawesi** regions.
+
+
+### PLOT 2.3: (bar plot)
+"DPD Bucket by Amount (04. 61-90 DPD) ~ Total Outstanding vs Island"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+Next, we're going to derive the latest *outstanding amount* from the *gross dataset*, specifically for the *“04. 61–90 DPD”* bucket in each island.
+```{r}
+# Gross: Outstanding amount for "04. DPD 61-90" bucket
+DPD_bucket_by_amount04_gross <- sqllab_gross_clean %>% 
+  filter(bucket == "04. 61-90 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount04_gross
+```
+
+We're also going to derive the latest *outstanding amount* from the *net and external dataset*, specifically for the *“04. 61–90 DPD”* bucket in each island.
+```{r}
+# Net: Outstanding amount for "04. DPD 61-90" bucket
+DPD_bucket_by_amount04_net <- sqllab_net_clean %>% 
+  filter(bucket == "04. 61-90 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount04_net
+```
+
+```{r}
+# External: Outstanding amount for "04. DPD 61-90" bucket
+DPD_bucket_by_amount04_external <- sqllab_external_clean %>% 
+  filter(bucket == "04. 61-90 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount04_external
+```
+
+After obtaining the latest *Gross, Net, and External outstanding amounts*, specifically for the *“04. 61–90 DPD”* bucket in each island, we're going to *merge* and *pivot* them into one dataset for easier visualization.
+```{r}
+# Merging Gross, Net, and External "04. DPD 61-90" bucket outstanding amounts into one dataset
+DPD_bucket_by_amount04 <- DPD_bucket_by_amount04_gross %>% 
+  inner_join(DPD_bucket_by_amount04_net, by = "island") %>% 
+  inner_join(DPD_bucket_by_amount04_external, by = "island") %>% 
+  rename(
+    Gross = outstanding_amount.x,
+    Net = outstanding_amount.y,
+    External = outstanding_amount
+  )
+
+DPD_bucket_by_amount04
+```
+
+```{r}
+# Pivot and adding NPL type column 
+DPD_bucket_by_amount04 <- DPD_bucket_by_amount04 %>%
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "Type",
+    values_to = "Total_OS"
+  ) %>% 
+  mutate(Type = factor(Type, levels = c("Gross", "Net", "External")))
+  
+DPD_bucket_by_amount04
+```
+
+```{r}
+# tooltip
+DPD_bucket_by_amount04 <- DPD_bucket_by_amount04 %>%
+  mutate(
+    label = glue(
+      "Total Oustanding:IDR {number(Total_OS, big.mark = '.', decimal.mark = ',', accuracy = 1)}"
+    )
+  )
+
+DPD_bucket_by_amount04
+```
+
+```{r}
+# PLOT 2.3: DPD Bucket by Amount (04. 61-90 DPD)
+plot2.3 <- ggplot(DPD_bucket_by_amount04, aes(x = island, 
+                    y = Total_OS,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Type)) +
+  geom_text(aes(y = Total_OS + 2.5e9,
+                label = format(floor(Total_OS/1e8)/10,
+                                     big.mark = ".",
+                                     decimal.mark = ","),
+                group = Type),
+            position = position_dodge(width = 1),
+            size = 3) +
+  scale_y_continuous(labels = label_number(scale = 1e-9, 
+                                           suffix = "B", 
+                                           accuracy = 1)) +
+   scale_fill_manual(values = c("darkgreen", "red","blue"),
+                    name = NULL) +
+  labs(title = "DPD 61-90",
+       x = "Island",
+       y = "Total Outstanding") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot2.3, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "DPD 61-90",
+      "<br><sup>in billion Rupiah</sup>")),
+      legend = list(orientation = "h",
+                    y = -0.3))
+```
+The chart illustrates **Total Outstanding (in billion Rupiah)** for **DPD 61–90** across various **islands** in Indonesia, divided into **Gross**, **Net**, and **External** categories.
+
+- **Sumatera** shows the highest exposure, reaching **100.6B Gross**, **76.2B Net**, and **62.0B External**, indicating significant outstanding amounts.  
+- **Jawa** follows with **70.9B Gross**, **53.8B Net**, and **44.5B External**, while **Sulawesi** and **Papua** also record relatively high figures.  
+- **Maluku** remains the lowest, with **16.9B Gross**, **12.5B Net**, and **10.7B External**.  
+- Consistent with previous trends, **Gross values** exceed **Net** and **External** across all regions, reflecting standard credit adjustments.  
+- Overall, the largest DPD 61–90 exposures are concentrated in **Sumatera** and **Jawa**, similar to the DPD 31–60 pattern.
+
+
+### PLOT 2.4: (bar plot)
+"DPD Bucket by Amount (05. 90+ DPD) ~ Total Outstanding vs Island"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+Lastly, for the DPD bucket by amount section, we’re going to derive the latest *outstanding amount* from the *gross, net, and external dataset*, specifically for the last bucket, *“05. 90+ DPD”*, in each island.
+```{r}
+# Gross: Outstanding amount for "05. 90+ DPD" bucket
+DPD_bucket_by_amount05_gross <- sqllab_gross_clean %>% 
+  filter(bucket == "05. 90+ DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount05_gross
+```
+
+```{r}
+# Net: Outstanding amount for "05. 90+ DPD" bucket
+DPD_bucket_by_amount05_net <- sqllab_net_clean %>% 
+  filter(bucket == "05. 90+ DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount05_net
+```
+
+```{r}
+# External: Outstanding amount for "05. 90+ DPD" bucket
+DPD_bucket_by_amount05_external <- sqllab_external_clean %>% 
+  filter(bucket == "05. 90+ DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(outstanding_amount = sum(outstanding_amount)) %>% 
+  ungroup()
+
+DPD_bucket_by_amount05_external
+```
+
+After obtaining the latest *Gross, Net, and External outstanding amounts*, specifically for the last bucket, *“05. 90+ DPD”* bucket in each island, we're going to *merge* and *pivot* them into one dataset for easier visualization.
+```{r}
+# Merging Gross, Net, and External "05. 90+ DPD" bucket outstanding amounts into one dataset
+DPD_bucket_by_amount05 <- DPD_bucket_by_amount05_gross %>% 
+  inner_join(DPD_bucket_by_amount05_net, by = "island") %>% 
+  inner_join(DPD_bucket_by_amount05_external, by = "island") %>% 
+  rename(
+    Gross = outstanding_amount.x,
+    Net = outstanding_amount.y,
+    External = outstanding_amount
+  )
+
+DPD_bucket_by_amount05
+```
+
+```{r}
+# Pivot and adding NPL type column 
+DPD_bucket_by_amount05 <- DPD_bucket_by_amount05 %>%
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "Type",
+    values_to = "Total_OS"
+  ) %>% 
+  mutate(Type = factor(Type, levels = c("Gross", "Net", "External")))
+  
+DPD_bucket_by_amount05
+```
+
+```{r}
+# tooltip
+DPD_bucket_by_amount05 <- DPD_bucket_by_amount05 %>%
+  mutate(
+    label = glue(
+      "Total Oustanding:IDR {number(Total_OS, big.mark = '.', decimal.mark = ',', accuracy = 1)}"
+    )
+  )
+
+DPD_bucket_by_amount05
+```
+
+```{r}
+# PLOT 2.4: DPD Bucket by Amount (05. 90+ DPD)
+plot2.4 <- ggplot(DPD_bucket_by_amount05, aes(x = island, 
+                    y = Total_OS,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Type)) +
+  geom_text(aes(y = Total_OS + 2.5e9,
+                label = format(floor(Total_OS/1e8)/10,
+                                     big.mark = ".",
+                                     decimal.mark = ","),
+                group = Type),
+            position = position_dodge(width = 0.9),
+            size = 3) +
+  scale_y_continuous(labels = label_number(scale = 1e-9, 
+                                           suffix = "B", 
+                                           accuracy = 1)) +
+   scale_fill_manual(values = c("darkgreen", "red","blue"),
+                    name = NULL) +
+  labs(title = "DPD 90+",
+       x = "Island",
+       y = "Total Outstanding") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot2.4, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "DPD 90+",
+      "<br><sup>in billion Rupiah</sup>")),
+      legend = list(orientation = "h",
+                    y = -0.3))
+```
+The chart presents **Total Outstanding (in billion Rupiah)** for **DPD 90+** across several **islands** in Indonesia, categorized into **Gross**, **Net**, and **External** amounts.
+
+- **Sumatera** records the highest figures, reaching **97.9B Gross**, **35.4B Net**, and **6.8B External**.  
+- **Jawa**, **Sulawesi**, and **Papua** also show substantial levels, particularly in the **Gross** category.  
+- **Maluku** and **Bali & Nusa Tenggara** maintain relatively lower totals, with **Gross** values under **35B**.  
+- The **Gross values** remain significantly higher than **Net** and **External** across all islands, indicating a notable gap due to risk provisions or write-offs.  
+- Overall, **Sumatera** continues to dominate outstanding amounts in **DPD 90+**, consistent with earlier DPD bands.
+
+
+## Section 2 (DPD Bucket by Accounts)
+
+Now, I’m going to create a similar set of **bar plots** to visualize the **total number of accounts (NOA)** across islands for each **DPD bucket**. These visualizations provide a clearer overview of accounts distribution within the `Gross`, `Net`, and `External` datasets, making it easier to compare the concentration of accounts across islands and bucket categories.
+
+The main goals of these plots are to:
+
+- Compare the **total number of accounts (NOA)** across `Gross`, `Net`, and `External` datasets.  
+- Identify which islands have the **highest** and **lowest number of accounts** within each DPD bucket.  
+- Analyze the **distribution of accounts** across islands and bucket categories.  
+- Highlight the `DPD 90+` bucket to identify islands that require more attention due to having higher numbers of **overdue accounts**.
+
+### PLOT 2.5: (bar plot)
+"DPD Bucket by accounts (02. 1-30 DPD) ~ Total NOA vs Island"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+Now, we're going to derive the latest *NOA* (Number of accounts) from the *gross dataset*, specifically for the *“02. 1–30 DPD”* bucket in each island.
+```{r}
+# Gross: NOA for "02. DPD 1-30" bucket
+DPD_bucket_by_accounts02_gross <- sqllab_gross_clean %>% 
+  filter(bucket == "02. 1-30 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa)) %>% 
+  ungroup()
+
+DPD_bucket_by_accounts02_gross
+```
+
+We're also going to derive the latest *NOA* from the *net and external dataset*, specifically for the *“02. 1–30 DPD”* bucket in each island.
+```{r}
+# Net: NOA for "02. DPD 1-30" bucket
+DPD_bucket_by_accounts02_net <- sqllab_net_clean %>% 
+  filter(bucket == "02. 1-30 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa))%>% 
+  ungroup()
+
+DPD_bucket_by_accounts02_net
+```
+
+```{r}
+# External: NOA for "02. DPD 1-30" bucket
+DPD_bucket_by_accounts02_external <- sqllab_external_clean %>% 
+  filter(bucket == "02. 1-30 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa)) %>% 
+  ungroup()
+
+DPD_bucket_by_accounts02_external
+```
+
+After obtaining the latest *Gross, Net, and External NOA*, specifically for the *“02. 1–30 DPD”* bucket in each island, we then *merge* and *pivot* them into one dataset for easier visualization.
+```{r}
+# Merging Gross, Net, and External "02. DPD 1-30" bucket NOA into one dataset
+DPD_bucket_by_accounts02 <- DPD_bucket_by_accounts02_gross %>% 
+  inner_join(DPD_bucket_by_accounts02_net, by = "island") %>% 
+  inner_join(DPD_bucket_by_accounts02_external, by = "island") %>% 
+  rename(
+    Gross = total_noa.x,
+    Net = total_noa.y,
+    External = total_noa
+  )
+
+DPD_bucket_by_accounts02
+```
+
+```{r}
+# Pivot and adding NPL type column 
+DPD_bucket_by_accounts02 <- DPD_bucket_by_accounts02 %>%
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "Type",
+    values_to = "Total_accounts"
+  ) %>% 
+  mutate(Type = factor(Type, levels = c("Gross", "Net", "External")))
+  
+DPD_bucket_by_accounts02
+```
+
+```{r}
+# tooltip
+DPD_bucket_by_accounts02 <- DPD_bucket_by_accounts02 %>%
+  mutate(
+    label = glue(
+      "Total accounts: {number(Total_accounts, big.mark = '.', decimal.mark = ',', accuracy = 1)}"
+    )
+  )
+
+DPD_bucket_by_accounts02
+```
+
+```{r}
+# PLOT 2.5: DPD Bucket by accounts (02. 1-30 DPD)
+plot2.5 <- ggplot(DPD_bucket_by_accounts02, aes(x = island, 
+                    y = Total_accounts,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Type)) +
+  geom_text(aes(y = Total_accounts + 500,
+                label = format(Total_accounts,
+                               big.mark = ".",
+                               decimal.mark = ","),
+                group = Type),
+            position = position_dodge(width = 1),
+            size = 2.5) +
+   scale_y_continuous(labels = label_comma(big.mark = ".", decimal.mark = ",")) +
+   scale_fill_manual(values = c("darkgreen", "red","blue"),
+                    name = NULL) +
+  labs(title = "DPD 1-30",
+       x = "Island",
+       y = "Total NOA") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot2.5, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "DPD 1-30")),
+      legend = list(orientation = "h",
+                    y = -0.3))
+```
+The chart shows **Total NOA** for **DPD 1–30** across different **islands** in Indonesia, categorized into **Gross**, **Net**, and **External** values.
+
+- **Sumatera** has the **highest** total with **32,592** accounts,  
+- while **Maluku** has the **lowest** with **6,638** accounts.  
+- All three categories (`Gross`, `Net`, and `External`) show **identical values** across each island, indicating no variation between NPL types at this delinquency stage.
+
+
+### PLOT 2.6: (bar plot)
+"DPD Bucket by accounts (03. 31-60 DPD) ~ Total NOA vs Island"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+Now, we're going to derive the latest *NOA* (Number of accounts) from the *gross, net, and external dataset*, specifically for the *“03. 31-60 DPD”* bucket in each island.
+```{r}
+# Gross: NOA for "03. 31-60 DPD" bucket
+DPD_bucket_by_accounts03_gross <- sqllab_gross_clean %>% 
+  filter(bucket == "03. 31-60 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa)) %>% 
+  ungroup()
+
+DPD_bucket_by_accounts03_gross
+```
+
+```{r}
+# Net: NOA for "03. 31-60 DPD" bucket
+DPD_bucket_by_accounts03_net <- sqllab_net_clean %>% 
+  filter(bucket == "03. 31-60 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa))%>% 
+  ungroup()
+
+DPD_bucket_by_accounts03_net
+```
+
+```{r}
+# External: NOA for "03. 31-60 DPD" bucket
+DPD_bucket_by_accounts03_external <- sqllab_external_clean %>% 
+  filter(bucket == "03. 31-60 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa)) %>% 
+  ungroup()
+
+DPD_bucket_by_accounts03_external
+```
+
+We then *merge* and *pivot* all the latest *Gross, Net, and External NOA* into one dataset for easier visualization.
+```{r}
+# Merging Gross, Net, and External "03. 31-60 DPD" bucket NOA into one dataset
+DPD_bucket_by_accounts03 <- DPD_bucket_by_accounts03_gross %>% 
+  inner_join(DPD_bucket_by_accounts03_net, by = "island") %>% 
+  inner_join(DPD_bucket_by_accounts03_external, by = "island") %>% 
+  rename(
+    Gross = total_noa.x,
+    Net = total_noa.y,
+    External = total_noa
+  )
+
+DPD_bucket_by_accounts03
+```
+
+
+```{r}
+# Pivot and adding NPL type column 
+DPD_bucket_by_accounts03 <- DPD_bucket_by_accounts03 %>%
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "Type",
+    values_to = "Total_accounts"
+  ) %>% 
+  mutate(Type = factor(Type, levels = c("Gross", "Net", "External")))
+  
+DPD_bucket_by_accounts03
+```
+
+```{r}
+# tooltip
+DPD_bucket_by_accounts03 <- DPD_bucket_by_accounts03 %>%
+  mutate(
+    label = glue(
+      "Total accounts: {number(Total_accounts, big.mark = '.', decimal.mark = ',', accuracy = 1)}"
+    )
+  )
+
+DPD_bucket_by_accounts03
+```
+
+```{r}
+# PLOT 2.6: DPD Bucket by accounts (03. 31-60 DPD)
+plot2.6 <- ggplot(DPD_bucket_by_accounts03, aes(x = island, 
+                    y = Total_accounts,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Type)) +
+  geom_text(aes(y = Total_accounts + 500,
+                label = format(Total_accounts,
+                               big.mark = ".",
+                               decimal.mark = ","),
+                group = Type),
+            position = position_dodge(width = 1),
+            size = 2.5) +
+   scale_y_continuous(labels = label_comma(big.mark = ".", decimal.mark = ",")) +
+   scale_fill_manual(values = c("darkgreen", "red","blue"),
+                    name = NULL) +
+  labs(title = "DPD 31-60",
+       x = "Island",
+       y = "Total NOA") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot2.6, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "DPD 31-60")),
+      legend = list(orientation = "h",
+                    y = -0.3))
+```
+The chart illustrates **Total NOA** for **DPD 31–60** across various **islands** in Indonesia, divided into **Gross**, **Net**, and **External** categories.
+
+- **Sumatera** has the **highest** total at **32.491** accounts,  
+- while **Maluku** has the **lowest** at **5.690** accounts.  
+
+
+### PLOT 2.7: (bar plot)
+"DPD Bucket by accounts (04. 61-90 DPD) ~ Total NOA vs Island"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+Now, we're going to derive the latest *NOA* (Number of accounts) from the *gross, net, and external dataset*, specifically for the *“04. 61-90 DPD”* bucket in each island.
+```{r}
+# Gross: NOA for "04. 61-90 DPD" bucket
+DPD_bucket_by_accounts04_gross <- sqllab_gross_clean %>% 
+  filter(bucket == "04. 61-90 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa)) %>% 
+  ungroup()
+
+DPD_bucket_by_accounts04_gross
+```
+
+```{r}
+# Net: NOA for "04. 61-90 DPD" bucket
+DPD_bucket_by_accounts04_net <- sqllab_net_clean %>% 
+  filter(bucket == "04. 61-90 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa))%>% 
+  ungroup()
+
+DPD_bucket_by_accounts04_net
+```
+
+```{r}
+# External: NOA for "04. 61-90 DPD" bucket
+DPD_bucket_by_accounts04_external <- sqllab_external_clean %>% 
+  filter(bucket == "04. 61-90 DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa)) %>% 
+  ungroup()
+
+DPD_bucket_by_accounts04_external
+```
+
+We then *merge* and *pivot* all the latest *Gross, Net, and External NOA* into one dataset for easier visualization.
+```{r}
+# Merging Gross, Net, and External "04. 61-90 DPD" bucket NOA into one dataset
+DPD_bucket_by_accounts04 <- DPD_bucket_by_accounts04_gross %>% 
+  inner_join(DPD_bucket_by_accounts04_net, by = "island") %>% 
+  inner_join(DPD_bucket_by_accounts04_external, by = "island") %>% 
+  rename(
+    Gross = total_noa.x,
+    Net = total_noa.y,
+    External = total_noa
+  )
+
+DPD_bucket_by_accounts04
+```
+
+```{r}
+# Pivot and adding NPL type column 
+DPD_bucket_by_accounts04 <- DPD_bucket_by_accounts04 %>%
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "Type",
+    values_to = "Total_accounts"
+  ) %>% 
+  mutate(Type = factor(Type, levels = c("Gross", "Net", "External")))
+  
+DPD_bucket_by_accounts04
+```
+
+```{r}
+# tooltip
+DPD_bucket_by_accounts04 <- DPD_bucket_by_accounts04 %>%
+  mutate(
+    label = glue(
+      "Total accounts: {number(Total_accounts, big.mark = '.', decimal.mark = ',', accuracy = 1)}"
+    )
+  )
+
+DPD_bucket_by_accounts04
+```
+
+```{r}
+# PLOT 2.7: DPD Bucket by accounts (04. 61-90 DPD)
+plot2.7<- ggplot(DPD_bucket_by_accounts04, aes(x = island, 
+                    y = Total_accounts,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Type)) +
+  geom_text(aes(y = Total_accounts + 500,
+                label = format(Total_accounts,
+                               big.mark = ".",
+                               decimal.mark = ","),
+                group = Type),
+            position = position_dodge(width = 1),
+            size = 2.5) +
+   scale_y_continuous(labels = label_comma(big.mark = ".", decimal.mark = ",")) +
+   scale_fill_manual(values = c("darkgreen", "red","blue"),
+                    name = NULL) +
+  labs(title = "DPD 61-90",
+       x = "Island",
+       y = "Total NOA") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot2.7, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "DPD 61-90")),
+      legend = list(orientation = "h",
+                    y = -0.3))
+```
+The chart displays **Total NOA** for **DPD 61–90** across several **islands** in Indonesia, grouped into **Gross**, **Net**, and **External** categories.
+
+- **Sumatera** has the **highest** total at **34.614** accounts,  
+- while **Maluku** has the **lowest** at **5.442** accounts.  
+
+
+### PLOT 2.8: (bar plot)
+"DPD Bucket by accounts (05. 90+ DPD) ~ Total NOA vs Island"
+```{r}
+# Dataset: Gross, Net, and External
+sqllab_gross_clean
+sqllab_net_clean
+sqllab_external_clean
+```
+
+Now, we're going to derive the latest *NOA* (Number of accounts) from the *gross, net, and external dataset*, specifically for the last bucket, *“05. 90+ DPD”* in each island.
+```{r}
+# Gross: NOA for "05. 90+ DPD" bucket
+DPD_bucket_by_accounts05_gross <- sqllab_gross_clean %>% 
+  filter(bucket == "05. 90+ DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa)) %>% 
+  ungroup()
+
+DPD_bucket_by_accounts05_gross
+```
+
+```{r}
+# Net: NOA for "05. 90+ DPD" bucket
+DPD_bucket_by_accounts05_net <- sqllab_net_clean %>% 
+  filter(bucket == "05. 90+ DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa))%>% 
+  ungroup()
+
+DPD_bucket_by_accounts05_net
+```
+
+```{r}
+# External: NOA for "05. 90+ DPD" bucket
+DPD_bucket_by_accounts05_external <- sqllab_external_clean %>% 
+  filter(bucket == "05. 90+ DPD",
+         cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(total_noa = sum(noa)) %>% 
+  ungroup()
+
+DPD_bucket_by_accounts05_external
+```
+
+We then *merge* and *pivot* all the latest *Gross, Net, and External NOA* into one dataset for easier visualization.
+```{r}
+# Merging Gross, Net, and External "05. 90+ DPD" bucket NOA into one dataset
+DPD_bucket_by_accounts05 <- DPD_bucket_by_accounts05_gross %>% 
+  inner_join(DPD_bucket_by_accounts05_net, by = "island") %>% 
+  inner_join(DPD_bucket_by_accounts05_external, by = "island") %>% 
+  rename(
+    Gross = total_noa.x,
+    Net = total_noa.y,
+    External = total_noa
+  )
+
+DPD_bucket_by_accounts05
+```
+
+```{r}
+# Pivot and adding NPL type column 
+DPD_bucket_by_accounts05 <- DPD_bucket_by_accounts05 %>%
+  pivot_longer(
+    cols = c(Gross, Net, External),
+    names_to = "Type",
+    values_to = "Total_accounts"
+  ) %>% 
+  mutate(Type = factor(Type, levels = c("Gross", "Net", "External")))
+  
+DPD_bucket_by_accounts05
+```
+
+```{r}
+# tooltip
+DPD_bucket_by_accounts05 <- DPD_bucket_by_accounts05 %>%
+  mutate(
+    label = glue(
+      "Total accounts: {number(Total_accounts, big.mark = '.', decimal.mark = ',', accuracy = 1)}"
+    )
+  )
+
+DPD_bucket_by_accounts05
+```
+
+```{r}
+# PLOT 2.8: DPD Bucket by accounts (05. 90+ DPD)
+plot2.8 <- ggplot(DPD_bucket_by_accounts05, aes(x = island, 
+                    y = Total_accounts,
+                    text = label)) +
+  
+  geom_col(position = position_dodge(width = 0.9),
+           aes(fill = Type)) +
+  geom_text(aes(y = Total_accounts + 750,
+                label = format(Total_accounts,
+                               big.mark = ".",
+                               decimal.mark = ","),
+                group = Type),
+            position = position_dodge(width = 1),
+            size = 2.5) +
+   scale_y_continuous(labels = label_comma(big.mark = ".", decimal.mark = ",")) +
+   scale_fill_manual(values = c("darkgreen", "red","blue"),
+                    name = NULL) +
+  labs(title = "DPD 90+",
+       x = "Island",
+       y = "Total NOA") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(plot2.8, tooltip = "text") %>% 
+  layout(title = list(text = paste0(
+      "DPD 90+")),
+      legend = list(orientation = "h",
+                    y = -0.3))
+```
+The chart shows **Total NOA** for **DPD 90+** across different **islands** in Indonesia, categorized into **Gross**, **Net**, and **External** values.
+
+- **Sumatera** has the **highest** total at **33.241** accounts,  
+- while **Maluku** has the **lowest** at **7.162** accounts.  
+
+
+# TAB 3 (NPL DETAIL)
+## Line 3.1 (NPL Net Detail: Island, Regional, Area, Branch)
+
+In this section, we’re going to create a tab that *displays the outstanding amount, NOA, and NPL for each DPD bucket*, based on the selected *cut off date, island, region, area, and branch* in the dashboard.
+
+### Island
+For the *island level*, we’re going to create *two datasets*: the first will display the outstanding amount, NOA, and NPL for each DPD bucket across *all islands*, while the second will include a *specific cut-off date* for more detailed analysis.
+```{r}
+# Dataset: Net
+sqllab_net_clean
+```
+
+```{r}
+# ISLAND: GENERAL ~> 1 input: Cut Off Date
+island_general <- sqllab_net_clean %>% 
+  filter(cut_off_date == "2025-11-01") %>% 
+  group_by(island) %>% 
+  summarise(
+    OS_Current = sum(ifelse(bucket == "01. Current", outstanding_amount, 0)),
+    NOA_Current = sum(ifelse(bucket == "01. Current", noa, 0)),
+    OS_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", outstanding_amount, 0)),
+    NOA_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", noa, 0)),
+    OS_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", outstanding_amount, 0)),
+    NOA_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", noa, 0)),
+    OS_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", outstanding_amount, 0)),
+    NOA_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", noa, 0)),
+    OS_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", outstanding_amount, 0)),
+    NOA_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", noa, 0)),
+    OS_Total = sum(outstanding_amount),
+    NOA_Total = sum(noa),
+    NPL= round(((OS_DPD_90_plus/OS_Total)*100),2)) %>% 
+  rename(
+    Island = island
+  ) %>% 
+  mutate(across(
+    everything(),
+    ~ format(.x, 
+             big.mark = ".", 
+             decimal.mark = ","))
+    )
+
+island_general
+```
+
+
+```{r}
+# ISLAND: SPECIFIC ~> 2 inputs: Cut Off Date & Island
+island_table <- sqllab_net_clean %>% 
+  filter(cut_off_date == "2025-11-01",
+         island == "Sumatera") %>% 
+  group_by(island) %>% 
+  summarise(
+    OS_Current = sum(ifelse(bucket == "01. Current", outstanding_amount, 0)),
+    NOA_Current = sum(ifelse(bucket == "01. Current", noa, 0)),
+    OS_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", outstanding_amount, 0)),
+    NOA_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", noa, 0)),
+    OS_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", outstanding_amount, 0)),
+    NOA_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", noa, 0)),
+    OS_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", outstanding_amount, 0)),
+    NOA_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", noa, 0)),
+    OS_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", outstanding_amount, 0)),
+    NOA_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", noa, 0)),
+    OS_Total = sum(outstanding_amount),
+    NOA_Total = sum(noa),
+    NPL= round(((OS_DPD_90_plus/OS_Total)*100),2)) %>% 
+  rename(
+    Island = island
+  ) %>% 
+  mutate(across(
+    everything(),
+    ~ format(.x, 
+             big.mark = ".", 
+             decimal.mark = ","))
+    )
+
+island_table
+```
+
+### Region
+We’re also going to apply the same approach for the *region level* by creating *two datasets*: the first will show the outstanding amount, NOA, and NPL for each DPD bucket across *all regions*, while the second will include a *specific cut-off date* for more detailed analysis.
+```{r}
+# REGION: GENERAL ~> 1 input: Cut Off Date 
+region_general <- sqllab_net_clean %>% 
+  filter(cut_off_date == "2025-11-01") %>% 
+  group_by(region) %>% 
+  summarise(
+    OS_Current = sum(ifelse(bucket == "01. Current", outstanding_amount, 0)),
+    NOA_Current = sum(ifelse(bucket == "01. Current", noa, 0)),
+    OS_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", outstanding_amount, 0)),
+    NOA_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", noa, 0)),
+    OS_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", outstanding_amount, 0)),
+    NOA_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", noa, 0)),
+    OS_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", outstanding_amount, 0)),
+    NOA_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", noa, 0)),
+    OS_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", outstanding_amount, 0)),
+    NOA_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", noa, 0)),
+    OS_Total = sum(outstanding_amount),
+    NOA_Total = sum(noa),
+    NPL= round(((OS_DPD_90_plus/OS_Total)*100),2)) %>% 
+  rename(
+    Region = region
+  ) %>% 
+  mutate(across(
+    everything(),
+    ~ format(.x, 
+             big.mark = ".", 
+             decimal.mark = ","))
+    )
+
+region_general
+```
+
+```{r}
+# Cross checking the total region in the Net Dataset
+unique(sqllab_net_clean$region)
+```
+By checking the total number of regions in the dataset, we can confirm that the *region_general* dataset is correct, as it contains *37 rows*, matching the *37 regions* found in the Net dataset.
+
+```{r}
+# REGION: SPECIFIC ~> 2 inputs: Cut Off Date & Region
+region_table <- sqllab_net_clean %>%
+  filter(cut_off_date == "2025-11-01",
+         region == "Sumatera Utara") %>% 
+  group_by(region) %>% 
+  summarise(
+    OS_Current = sum(ifelse(bucket == "01. Current", outstanding_amount, 0)),
+    NOA_Current = sum(ifelse(bucket == "01. Current", noa, 0)),
+    OS_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", outstanding_amount, 0)),
+    NOA_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", noa, 0)),
+    OS_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", outstanding_amount, 0)),
+    NOA_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", noa, 0)),
+    OS_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", outstanding_amount, 0)),
+    NOA_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", noa, 0)),
+    OS_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", outstanding_amount, 0)),
+    NOA_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", noa, 0)),
+    OS_Total = sum(outstanding_amount),
+    NOA_Total = sum(noa),
+    NPL= round(((OS_DPD_90_plus/OS_Total)*100),2)) %>% 
+  rename(
+    Region = region
+  ) %>% 
+  mutate(across(
+    everything(),
+    ~ format(.x, 
+             big.mark = ".", 
+             decimal.mark = ","))
+    )
+
+region_table
+```
+
+### Area
+We will also perform the same process for the area level by creating two datasets: the first will display the *outstanding amount, NOA,* and *NPL* for each *DPD bucket* across *all areas*, while the second will include a *specific cut-off date* for more detailed analysis.
+```{r}
+# Area: GENERAL ~> 1 input: Cut Off Date
+area_general <- sqllab_net_clean %>% 
+  filter(cut_off_date  == "2025-11-01") %>% 
+  group_by(area) %>% 
+  summarise(
+    OS_Current = sum(ifelse(bucket == "01. Current", outstanding_amount, 0)),
+    NOA_Current = sum(ifelse(bucket == "01. Current", noa, 0)),
+    OS_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", outstanding_amount, 0)),
+    NOA_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", noa, 0)),
+    OS_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", outstanding_amount, 0)),
+    NOA_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", noa, 0)),
+    OS_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", outstanding_amount, 0)),
+    NOA_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", noa, 0)),
+    OS_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", outstanding_amount, 0)),
+    NOA_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", noa, 0)),
+    OS_Total = sum(outstanding_amount),
+    NOA_Total = sum(noa),
+    NPL= round(((OS_DPD_90_plus/OS_Total)*100),2)) %>% 
+  rename(
+    Area = area
+  ) %>% 
+  mutate(across(
+    everything(),
+    ~ format(.x, 
+             big.mark = ".", 
+             decimal.mark = ","))
+    )
+  
+area_general
+```
+
+```{r}
+# Cross checking the total areas in the Net Dataset
+unique(sqllab_net_clean$area)
+```
+We can confirm that the area_general dataset is correct, as it contains *148 rows*, which aligns with the *148 areas* present in the Net dataset.
+
+Similar to the previous Region: Specific section, this code first *filters* the data based on the *cut-off date* and *region.* However, this time we *group* the filtered data by *area* and then summarize it to obtain the outstanding amount, NOA, and NPL for each DPD bucket across all areas.
+```{r}
+# Area: SPECIFIC ~> 2 inputs: Cut Off Date & Region
+area_table <- sqllab_net_clean %>%
+  filter(cut_off_date == "2025-11-01",
+         region == "Sumatera Utara") %>% 
+  group_by(area) %>% 
+  summarise(
+    OS_Current = sum(ifelse(bucket == "01. Current", outstanding_amount, 0)),
+    NOA_Current = sum(ifelse(bucket == "01. Current", noa, 0)),
+    OS_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", outstanding_amount, 0)),
+    NOA_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", noa, 0)),
+    OS_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", outstanding_amount, 0)),
+    NOA_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", noa, 0)),
+    OS_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", outstanding_amount, 0)),
+    NOA_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", noa, 0)),
+    OS_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", outstanding_amount, 0)),
+    NOA_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", noa, 0)),
+    OS_Total = sum(outstanding_amount),
+    NOA_Total = sum(noa),
+    NPL= round(((OS_DPD_90_plus/OS_Total)*100),2)) %>% 
+  rename(
+    Area = area
+  ) %>% 
+  mutate(across(
+    everything(),
+    ~ format(.x, 
+             big.mark = ".", 
+             decimal.mark = ","))
+    )
+
+area_table
+```
+
+### Branch
+Lastly, we will perform the same process for the *branch level* by creating *two datasets*: the first will display the outstanding amount, NOA, and NPL for each DPD bucket across *all branches*, while the second will include a *specific cut-off date* for more detailed analysis.
+```{r}
+# Branch: GENERAL ~> 1 input: Cut Off Date
+branch_general <- sqllab_net_clean %>% 
+  filter(cut_off_date  == "2025-11-01") %>% 
+  group_by(branch) %>% 
+  summarise(
+    OS_Current = sum(ifelse(bucket == "01. Current", outstanding_amount, 0)),
+    NOA_Current = sum(ifelse(bucket == "01. Current", noa, 0)),
+    OS_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", outstanding_amount, 0)),
+    NOA_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", noa, 0)),
+    OS_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", outstanding_amount, 0)),
+    NOA_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", noa, 0)),
+    OS_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", outstanding_amount, 0)),
+    NOA_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", noa, 0)),
+    OS_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", outstanding_amount, 0)),
+    NOA_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", noa, 0)),
+    OS_Total = sum(outstanding_amount),
+    NOA_Total = sum(noa),
+    NPL= round(((OS_DPD_90_plus/OS_Total)*100),2)) %>% 
+  rename(
+    Branch = branch
+  ) %>% 
+  mutate(across(
+    everything(),
+    ~ format(.x, 
+             big.mark = ".", 
+             decimal.mark = ","))
+    )
+  
+branch_general
+```
+
+```{r}
+# Cross checking the total region in the Net Dataset
+unique(sqllab_net_clean$branch)
+```
+We can confirm that the *branch_general* dataset is correct, as it contains *444 rows*, which matches the *444 branches* found in the Net dataset.
+
+The branch-specific code is slightly more complex, as we first need to *filter* the data based on three inputs: *cut-off date, region,* and *area*. We then *group* the data by *area* and *branch* to obtain the specific branches within the selected area for detailed analysis.
+```{r}
+# BRANCH: SPECIFIC ~> 3 inputs: Cut Off Date & Region, and Area
+branch_table <- sqllab_net_clean %>%
+  filter(cut_off_date == "2025-11-01",
+         region == "Sumatera Utara",
+         area == "Sumatera Utara Area 2") %>% 
+  group_by(area, branch) %>% 
+  summarise(
+    OS_Current = sum(ifelse(bucket == "01. Current", outstanding_amount, 0)),
+    NOA_Current = sum(ifelse(bucket == "01. Current", noa, 0)),
+    OS_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", outstanding_amount, 0)),
+    NOA_DPD_1_30 = sum(ifelse(bucket == "02. 1-30 DPD", noa, 0)),
+    OS_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", outstanding_amount, 0)),
+    NOA_DPD_31_60 = sum(ifelse(bucket == "03. 31-60 DPD", noa, 0)),
+    OS_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", outstanding_amount, 0)),
+    NOA_DPD_61_90 = sum(ifelse(bucket == "04. 61-90 DPD", noa, 0)),
+    OS_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", outstanding_amount, 0)),
+    NOA_DPD_90_plus = sum(ifelse(bucket == "05. 90+ DPD", noa, 0)),
+    OS_Total = sum(outstanding_amount),
+    NOA_Total = sum(noa),
+    NPL= round(((OS_DPD_90_plus/OS_Total)*100),2)) %>% 
+  rename(
+    Area = area,
+    Branch = branch
+  ) %>% 
+  mutate(across(
+    everything(),
+    ~ format(.x, 
+             big.mark = ".", 
+             decimal.mark = ","))
+    )
+
+branch_table
+```
+
+# DONE
