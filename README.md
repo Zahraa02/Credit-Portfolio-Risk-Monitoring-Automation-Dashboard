@@ -1,4 +1,3 @@
-```markdown
 # 📈⚠️ Credit Portfolio Risk Monitoring & Automation Dashboard  
 
 An interactive risk monitoring dashboard that uncovers **credit portfolio quality, delinquency trends, and loan performance patterns across Indonesia**, built using **R and Shiny**.  
