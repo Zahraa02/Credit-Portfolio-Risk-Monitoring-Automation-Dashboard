@@ -117,7 +117,7 @@ This dashboard transforms raw credit portfolio data into **real-time, actionable
 
 By automating reporting workflows and centralizing portfolio analytics, it helps improve operational efficiency, strengthen credit risk monitoring, and support proactive decision-making in financial institutions.  
 
-Beyond this specific use case, the project demonstrates how **data analytics, automation, and dashboard development** can modernize traditional risk monitoring processes — reducing manual effort while improving visibility into portfolio health and emerging risks.  
+Beyond this specific use case, the project demonstrates how **data analytics, automation, and dashboard development** can modernize traditional risk monitoring processes, reducing manual effort while improving visibility into portfolio health and emerging risks.  
 
 ---
 
