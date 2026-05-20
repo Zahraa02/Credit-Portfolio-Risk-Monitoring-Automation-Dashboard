@@ -31,7 +31,7 @@ The dashboard emphasizes **automation, operational efficiency, and actionable ri
 
 ## 💼 Business Questions Examples  
 - "Which regions or islands contribute the highest credit risk exposure across Gross, Net, and External portfolios?"  
-- "How do DPD bucket movements and flow rates indicate worsening or improving portfolio quality over time?"  
+- "How has portfolio quality changed over time across Gross, Net, and External portfolios?" 
 - "Which areas show increasing NPL trends and require early intervention from risk management teams?"  
 - "How can automated reporting improve operational efficiency and reduce manual monitoring efforts?"  
 
